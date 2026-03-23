@@ -492,74 +492,147 @@ function updateStats(){
   document.getElementById('stat-done').textContent=done;
 }
 
-// ─── GITHUB SYNC ──────────────────────────────────────────────────────────────
+// ─── GITHUB SYNC (direct GitHub API — no Streamlit proxy) ────────────────────
 async function loadFromGithub(){
   const cfg=window.APP_CONFIG||{};
-  if(!cfg.ghConfigured){document.getElementById('sync-status').textContent='⚠ GitHub not configured';return;}
-  document.getElementById('sync-status').textContent='Loading from GitHub…';
-  try{
-    const r=await fetch(`${cfg.streamlitBase}?action=load`);
-    const d=await r.json();
-    if(d?.notes){notes=d.notes;ghSha=d.sha||null;}
-    if(d?.notes?.__donePractice__)donePractice=d.notes.__donePractice__;
+  // Use initialNotes injected by Streamlit at render time (already loaded server-side)
+  if(cfg.initialNotes && Object.keys(cfg.initialNotes).length){
+    notes = cfg.initialNotes;
+    ghSha = cfg.initialSha || null;
+    if(notes.__donePractice__){ donePractice=notes.__donePractice__; delete notes.__donePractice__; }
+    if(notes.__attachments__){ attachments=notes.__attachments__; delete notes.__attachments__; }
     document.getElementById('sync-status').textContent='✓ Loaded from GitHub';
-    updateStats();renderSidebar();
-  }catch(e){document.getElementById('sync-status').textContent='Load failed';}
+    updateStats(); renderSidebar(); return;
+  }
+  if(!cfg.ghConfigured){ document.getElementById('sync-status').textContent='⚠ GitHub not configured'; return; }
+  document.getElementById('sync-status').textContent='Loading…';
+  try{
+    const url=`https://api.github.com/repos/${cfg.githubRepo}/contents/${cfg.notesFile}?ref=${cfg.githubBranch}`;
+    const r=await fetch(url,{headers:{'Authorization':`token ${cfg.githubToken}`,'Accept':'application/vnd.github.v3+json'}});
+    if(r.ok){
+      const d=await r.json();
+      const parsed=JSON.parse(atob(d.content.replace(/\n/g,'')));
+      notes=parsed; ghSha=d.sha;
+      if(notes.__donePractice__){ donePractice=notes.__donePractice__; delete notes.__donePractice__; }
+      if(notes.__attachments__){ attachments=notes.__attachments__; delete notes.__attachments__; }
+      document.getElementById('sync-status').textContent='✓ Loaded';
+    } else if(r.status===404){
+      document.getElementById('sync-status').textContent='No saved notes yet';
+    } else {
+      document.getElementById('sync-status').textContent=`Load error ${r.status}`;
+    }
+    updateStats(); renderSidebar();
+  }catch(e){ document.getElementById('sync-status').textContent='Load failed: '+e.message; }
 }
+
 async function syncToGithub(){
   saveCurrentNote();
   const cfg=window.APP_CONFIG||{};
-  if(!cfg.ghConfigured){showToast('Configure GitHub secrets first','err');return;}
+  if(!cfg.ghConfigured){ showToast('Configure GitHub secrets in Streamlit','err'); return; }
   const btn=document.getElementById('sync-btn');
-  btn.disabled=true;btn.innerHTML='<span class="spinner"></span> Saving…';
+  btn.disabled=true; btn.innerHTML='<span class="spinner"></span> Saving…';
   document.getElementById('sync-status').textContent='Saving to GitHub…';
   try{
-    const payload={notes:{...notes,__donePractice__:donePractice},sha:ghSha};
-    const r=await fetch(`${cfg.streamlitBase}?action=save`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    // Build payload: notes + donePractice + attachments
+    const payload={...notes, __donePractice__:donePractice, __attachments__:attachments};
+    const content=btoa(unescape(encodeURIComponent(JSON.stringify(payload,null,2))));
+    const body={message:'Update GenAI notes',content,branch:cfg.githubBranch};
+    if(ghSha) body.sha=ghSha;
+    const url=`https://api.github.com/repos/${cfg.githubRepo}/contents/${cfg.notesFile}`;
+    const r=await fetch(url,{
+      method:'PUT',
+      headers:{'Authorization':`token ${cfg.githubToken}`,'Accept':'application/vnd.github.v3+json','Content-Type':'application/json'},
+      body:JSON.stringify(body)
+    });
     const d=await r.json();
-    if(d.ok){showToast(d.msg||'Saved ✓','ok');document.getElementById('sync-status').textContent='✓ Synced to GitHub';}
-    else{showToast(d.msg||'Save failed','err');document.getElementById('sync-status').textContent='Save failed';}
-  }catch(e){showToast('Network error','err');document.getElementById('sync-status').textContent='Network error';}
-  btn.disabled=false;btn.innerHTML='<span>⟳</span> Save to GitHub';
+    if(r.ok){
+      ghSha=d.content?.sha||ghSha;
+      showToast('Saved to GitHub ✓','ok');
+      document.getElementById('sync-status').textContent='✓ Synced to GitHub';
+    } else {
+      const msg=d.message||`Error ${r.status}`;
+      showToast('Save failed: '+msg,'err');
+      document.getElementById('sync-status').textContent='Save failed';
+      console.error('GitHub save error:',d);
+    }
+  }catch(e){
+    showToast('Network error: '+e.message,'err');
+    document.getElementById('sync-status').textContent='Network error';
+    console.error(e);
+  }
+  btn.disabled=false; btn.innerHTML='<span>⟳</span> Save to GitHub';
+}
+
+// ─── ANTHROPIC API (direct call from browser) ─────────────────────────────────
+async function callAnthropic(prompt){
+  const cfg=window.APP_CONFIG||{};
+  if(!cfg.aiConfigured) throw new Error('ANTHROPIC_API_KEY not set');
+  const r=await fetch('https://api.anthropic.com/v1/messages',{
+    method:'POST',
+    headers:{
+      'x-api-key':cfg.anthropicKey,
+      'anthropic-version':'2023-06-01',
+      'content-type':'application/json',
+      'anthropic-dangerous-direct-browser-access':'true'
+    },
+    body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:700,messages:[{role:'user',content:prompt}]})
+  });
+  if(!r.ok){ const e=await r.json(); throw new Error(e.error?.message||`API error ${r.status}`); }
+  const d=await r.json();
+  return d.content[0].text;
 }
 
 // ─── AI REVISION ──────────────────────────────────────────────────────────────
 async function reviseWithAI(){
   const cfg=window.APP_CONFIG||{};
-  if(!cfg.aiConfigured){showToast('Set ANTHROPIC_API_KEY in secrets','err');return;}
+  if(!cfg.aiConfigured){ showToast('Set ANTHROPIC_API_KEY in Streamlit secrets','err'); return; }
   const topic=document.getElementById('topic-title').textContent;
   const note=document.getElementById('note-editor').value;
   const body=document.getElementById('revision-body');
-  body.innerHTML='<div style="color:var(--text3);padding:16px;text-align:center"><span class="spinner"></span><br/><br/>Generating…</div>';
+  body.innerHTML='<div style="color:var(--text3);padding:16px;text-align:center"><span class="spinner"></span><br/><br/>Generating revision…</div>';
+  const prompt=`You are a concise GenAI teacher. The student is studying: **${topic}**
+
+Their notes:
+${note||'(no notes yet)'}
+
+Generate a sharp, exam-ready revision summary with:
+1. Core concept in one sentence
+2. Key points (5–8 bullets, each ≤ 15 words)
+3. Common gotcha / tricky part
+4. One analogy that makes it click
+
+Keep it tight — max 250 words. Use markdown.`;
   try{
-    const r=await fetch(`${cfg.streamlitBase}?${new URLSearchParams({action:'revise',topic,note})}`);
-    const d=await r.json();
-    body.innerHTML=d.text?`<div class="revision-content">${marked.parse(d.text)}</div>`:'<div class="revision-placeholder">No response.</div>';
-  }catch(e){body.innerHTML='<div class="revision-placeholder">Error.</div>';}
+    const text=await callAnthropic(prompt);
+    body.innerHTML=`<div class="revision-content">${marked.parse(text)}</div>`;
+  }catch(e){
+    body.innerHTML=`<div class="revision-placeholder">Error: ${e.message}</div>`;
+  }
 }
 
 // ─── AI PRACTICE HELP ─────────────────────────────────────────────────────────
 async function practiceAI(mode,pid){
   const cfg=window.APP_CONFIG||{};
-  if(!cfg.aiConfigured){showToast('Set ANTHROPIC_API_KEY in secrets','err');return;}
+  if(!cfg.aiConfigured){ showToast('Set ANTHROPIC_API_KEY in Streamlit secrets','err'); return; }
   const p=PRACTICE_CATS.flatMap(c=>c.projects).find(x=>x.id===pid);
   const body=document.getElementById('revision-body');
   body.innerHTML='<div style="color:var(--text3);padding:16px;text-align:center"><span class="spinner"></span><br/><br/>Generating…</div>';
   const prompts={
-    explain:`You are a GenAI mentor. Explain the core concepts for this project in an intuitive way (200 words max):\n\nProject: ${p.title}\nConcepts: ${p.concepts.join(', ')}\n\nUse bullet points and focus on intuition, not math.`,
-    hint:`Give 3 specific implementation hints (not solutions) for this project:\n\nProject: ${p.title}\nTools: ${p.tools.join(', ')}\nSteps: ${p.steps.slice(0,4).join('; ')}\n\nBe specific to the actual code challenges. Nudge without spoiling.`,
-    pitfalls:`List the top 5 pitfalls and debugging tips for this project. Be specific:\n\nProject: ${p.title}\n\nFormat as a numbered list with brief explanations.`
+    explain:`You are a GenAI mentor. Explain the core concepts for this project intuitively (200 words max):\n\nProject: ${p.title}\nConcepts: ${p.concepts.join(', ')}\n\nBullet points, focus on intuition not math.`,
+    hint:`Give 3 specific implementation hints (not full solutions):\n\nProject: ${p.title}\nTools: ${p.tools.join(', ')}\nSteps: ${p.steps.slice(0,4).join('; ')}\n\nNudge without spoiling.`,
+    pitfalls:`List the top 5 pitfalls and debugging tips for this project:\n\nProject: ${p.title}\n\nNumbered list with brief explanations.`
   };
+  const aiButtons=`<div style="padding:8px;display:flex;flex-direction:column;gap:5px">
+    <button class="btn btn-revise" style="width:100%;justify-content:center;font-size:11px" onclick="practiceAI('explain','${pid}')">✦ Explain concepts</button>
+    <button class="btn btn-revise" style="width:100%;justify-content:center;font-size:11px" onclick="practiceAI('hint','${pid}')">💡 Hint</button>
+    <button class="btn btn-revise" style="width:100%;justify-content:center;font-size:11px" onclick="practiceAI('pitfalls','${pid}')">⚠ Pitfalls</button>
+  </div>`;
   try{
-    const r=await fetch(`${cfg.streamlitBase}?${new URLSearchParams({action:'revise',topic:p.title,note:prompts[mode]})}`);
-    const d=await r.json();
-    body.innerHTML=d.text?`<div class="revision-content">${marked.parse(d.text)}</div>
-      <div style="padding:8px;display:flex;flex-direction:column;gap:5px">
-        <button class="btn btn-revise" style="width:100%;justify-content:center;font-size:11px" onclick="practiceAI('explain','${pid}')">✦ Explain concepts</button>
-        <button class="btn btn-revise" style="width:100%;justify-content:center;font-size:11px" onclick="practiceAI('hint','${pid}')">💡 Hint</button>
-        <button class="btn btn-revise" style="width:100%;justify-content:center;font-size:11px" onclick="practiceAI('pitfalls','${pid}')">⚠ Pitfalls</button>
-      </div>`:'<div class="revision-placeholder">No response.</div>';
-  }catch(e){body.innerHTML='<div class="revision-placeholder">Error.</div>';}
+    const text=await callAnthropic(prompts[mode]);
+    body.innerHTML=`<div class="revision-content">${marked.parse(text)}</div>${aiButtons}`;
+  }catch(e){
+    body.innerHTML=`<div class="revision-placeholder">Error: ${e.message}</div>${aiButtons}`;
+  }
 }
 
 // ─── TOAST ────────────────────────────────────────────────────────────────────
@@ -752,32 +825,6 @@ const _origSelectTopic = selectTopic;
 selectTopic = function(phaseId, topic, key, color, phaseLabel){
   _origSelectTopic(phaseId, topic, key, color, phaseLabel);
   renderAttachPanel();
-};
-
-// ── Patch syncToGithub to include attachments in the save payload ─────────────
-const _origSync = syncToGithub;
-syncToGithub = async function(){
-  // save current note text first
-  saveCurrentNote();
-  // build merged payload: notes + donePractice + attachments
-  const cfg=window.APP_CONFIG||{};
-  if(!cfg.ghConfigured){showToast('Configure GitHub secrets first','err');return;}
-  const btn=document.getElementById('sync-btn');
-  btn.disabled=true;btn.innerHTML='<span class="spinner"></span> Saving…';
-  document.getElementById('sync-status').textContent='Saving to GitHub…';
-  try{
-    const payload={
-      notes:{...notes, __donePractice__:donePractice, __attachments__:attachments},
-      sha:ghSha
-    };
-    const r=await fetch(`${cfg.streamlitBase}?action=save`,{
-      method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)
-    });
-    const d=await r.json();
-    if(d.ok){showToast(d.msg||'Saved ✓','ok');document.getElementById('sync-status').textContent='✓ Synced to GitHub';}
-    else{showToast(d.msg||'Save failed','err');document.getElementById('sync-status').textContent='Save failed';}
-  }catch(e){showToast('Network error','err');document.getElementById('sync-status').textContent='Network error';}
-  btn.disabled=false;btn.innerHTML='<span>⟳</span> Save to GitHub';
 };
 
 // ── Patch loadFromGithub to restore attachments ───────────────────────────────
