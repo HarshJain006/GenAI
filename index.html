@@ -136,6 +136,49 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
 ::-webkit-scrollbar{width:4px;height:4px}
 ::-webkit-scrollbar-track{background:transparent}
 ::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
+
+/* ── Attachments panel ── */
+#attach-panel{flex-shrink:0;border-top:1px solid var(--border);background:var(--bg2);display:none;flex-direction:column;max-height:280px}
+#attach-panel.visible{display:flex}
+.attach-header{display:flex;align-items:center;gap:8px;padding:6px 12px;border-bottom:1px solid var(--border);flex-shrink:0}
+.attach-title{font-size:10px;font-family:var(--font-mono);color:var(--text3);text-transform:uppercase;letter-spacing:.05em;flex:1}
+.attach-add-row{display:flex;gap:6px}
+.attach-add-btn{display:flex;align-items:center;gap:4px;padding:4px 10px;border-radius:6px;border:1px dashed var(--border2);background:none;color:var(--text3);font-size:10px;font-family:var(--font-mono);cursor:pointer;transition:all .15s;white-space:nowrap}
+.attach-add-btn:hover{border-color:var(--accent);color:var(--accent);background:#7c6ef710}
+#attach-scroll{overflow-y:auto;padding:8px 12px;display:flex;flex-direction:column;gap:10px}
+#attach-scroll::-webkit-scrollbar{width:3px}
+#attach-scroll::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
+
+/* images grid */
+.attach-section-label{font-size:10px;font-family:var(--font-mono);color:var(--text3);margin-bottom:5px;text-transform:uppercase;letter-spacing:.04em}
+.img-grid{display:flex;flex-wrap:wrap;gap:8px}
+.img-card{position:relative;border-radius:8px;overflow:hidden;border:1px solid var(--border);background:var(--bg3);flex-shrink:0;cursor:pointer;transition:border-color .15s}
+.img-card:hover{border-color:var(--border2)}
+.img-card img{display:block;height:80px;width:auto;max-width:140px;object-fit:cover}
+.img-card .img-name{font-size:9px;font-family:var(--font-mono);color:var(--text3);padding:2px 5px;background:var(--bg3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:140px}
+.img-del{position:absolute;top:3px;right:3px;width:16px;height:16px;border-radius:50%;background:#ef444499;color:#fff;border:none;font-size:10px;cursor:pointer;display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity .15s;line-height:1}
+.img-card:hover .img-del{opacity:1}
+
+/* code file list */
+.code-file{border:1px solid var(--border);border-radius:8px;overflow:hidden;background:var(--bg3)}
+.code-file-header{display:flex;align-items:center;gap:7px;padding:5px 10px;background:var(--bg2);border-bottom:1px solid var(--border)}
+.code-file-icon{font-size:11px}
+.code-file-name{font-size:11px;font-family:var(--font-mono);color:var(--text2);flex:1}
+.code-file-lang{font-size:9px;font-family:var(--font-mono);color:var(--text3);padding:1px 6px;background:var(--bg3);border-radius:10px}
+.code-file-actions{display:flex;gap:4px}
+.code-file-btn{background:none;border:none;color:var(--text3);cursor:pointer;font-size:11px;padding:2px 5px;border-radius:4px;transition:all .15s}
+.code-file-btn:hover{background:var(--border);color:var(--text)}
+.code-file-body{max-height:120px;overflow-y:auto;padding:8px 10px;font-family:var(--font-mono);font-size:11px;line-height:1.6;color:var(--cyan);white-space:pre;overflow-x:auto}
+
+/* lightbox */
+#lightbox{position:fixed;inset:0;background:#000000cc;display:flex;align-items:center;justify-content:center;z-index:9999;opacity:0;pointer-events:none;transition:opacity .2s}
+#lightbox.open{opacity:1;pointer-events:all}
+#lightbox img{max-width:90vw;max-height:88vh;border-radius:10px;border:1px solid var(--border2)}
+#lightbox-close{position:absolute;top:16px;right:20px;background:var(--bg3);border:1px solid var(--border2);color:var(--text);width:32px;height:32px;border-radius:50%;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+#lightbox-name{position:absolute;bottom:20px;left:50%;transform:translateX(-50%);background:var(--bg2);border:1px solid var(--border);color:var(--text2);font-size:12px;font-family:var(--font-mono);padding:4px 14px;border-radius:20px;white-space:nowrap}
+
+/* hidden file inputs */
+#img-input,#code-input{display:none}
 </style>
 </head>
 <body>
@@ -177,9 +220,27 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--f
     </div>
   </div>
   <div id="content" style="display:none">
-    <div id="editor-pane">
+    <div id="editor-pane" style="position:relative">
       <div class="pane-label">📝 your notes — markdown supported</div>
       <textarea id="note-editor" placeholder="Write notes here…&#10;&#10;Tips:&#10;• Explain it in your own words&#10;• Add code snippets and examples&#10;• Note gotchas and common mistakes&#10;• Then click ✦ AI Revise for a sharp summary"></textarea>
+      <div id="attach-panel">
+        <div class="attach-header">
+          <span class="attach-title">📎 attachments</span>
+          <div class="attach-add-row">
+            <button class="attach-add-btn" onclick="document.getElementById('img-input').click()">🖼 Image</button>
+            <button class="attach-add-btn" onclick="document.getElementById('code-input').click()">📄 Code file</button>
+          </div>
+        </div>
+        <div id="attach-scroll"></div>
+      </div>
+      <div id="drop-overlay" style="display:none;position:absolute;inset:0;background:#7c6ef730;border:2px dashed var(--accent);z-index:10;align-items:center;justify-content:center;font-family:var(--font-head);font-size:14px;color:var(--accent);pointer-events:none">Drop images or code files here</div>
+    </div>
+    <input type="file" id="img-input" accept="image/*" multiple onchange="handleImageUpload(this.files)"/>
+    <input type="file" id="code-input" accept=".py,.js,.ts,.jsx,.tsx,.json,.yaml,.yml,.txt,.md,.sh,.bash,.cpp,.c,.java,.rs,.go,.sql,.html,.css" multiple onchange="handleCodeUpload(this.files)"/>
+    <div id="lightbox" onclick="closeLightbox()">
+      <button id="lightbox-close" onclick="closeLightbox(event)">✕</button>
+      <img id="lightbox-img" src="" alt=""/>
+      <div id="lightbox-name"></div>
     </div>
     <div id="practice-pane">
       <div class="pane-label" id="practice-pane-label">⚡ hands-on project</div>
@@ -507,6 +568,237 @@ function showToast(msg,type=''){
   t.textContent=msg;t.className=`show ${type}`;
   setTimeout(()=>{t.className='';},2800);
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ATTACHMENTS  (stored as: attachments[topicKey] = [{type,name,data,lang?}])
+// ═══════════════════════════════════════════════════════════════════════════════
+let attachments = {};  // { "p1::topic": [{type:"image"|"code", name, data(base64 or text), lang}] }
+
+// key helpers
+function attachKey(){ return currentKey ? '__att__::'+currentKey : null; }
+
+function getAttachments(){
+  const k=attachKey(); if(!k) return [];
+  return attachments[k] || [];
+}
+function setAttachments(arr){
+  const k=attachKey(); if(!k) return;
+  if(arr.length) attachments[k]=arr; else delete attachments[k];
+}
+
+// ── Render attachment panel ───────────────────────────────────────────────────
+function renderAttachPanel(){
+  const k=attachKey();
+  const panel=document.getElementById('attach-panel');
+  const scroll=document.getElementById('attach-scroll');
+  if(!k){ panel.classList.remove('visible'); scroll.innerHTML=''; return; }
+
+  panel.classList.add('visible');
+  const items=getAttachments();
+  if(!items.length){ scroll.innerHTML='<div style="font-size:11px;color:var(--text3);font-family:var(--font-mono);padding:6px 4px">No attachments yet — drop files here or use buttons above</div>'; return; }
+
+  const imgs  = items.filter(f=>f.type==='image');
+  const codes = items.filter(f=>f.type==='code');
+  let html='';
+
+  if(imgs.length){
+    html+=`<div>
+      <div class="attach-section-label">Images (${imgs.length})</div>
+      <div class="img-grid">${imgs.map((f)=>`
+        <div class="img-card" onclick="openLightbox(${items.indexOf(f)})">
+          <img src="${f.data}" alt="${esc2(f.name)}"/>
+          <div class="img-name">${esc2(f.name)}</div>
+          <button class="img-del" onclick="deleteAttach(event,${items.indexOf(f)})">✕</button>
+        </div>`).join('')}
+      </div>
+    </div>`;
+  }
+
+  if(codes.length){
+    html+=`<div>
+      <div class="attach-section-label" style="margin-top:${imgs.length?'10px':'0'}">Code files (${codes.length})</div>
+      ${codes.map((f)=>{
+        const idx=items.indexOf(f);
+        return `<div class="code-file" style="margin-bottom:6px">
+          <div class="code-file-header">
+            <span class="code-file-icon">${codeIcon(f.lang)}</span>
+            <span class="code-file-name">${esc2(f.name)}</span>
+            <span class="code-file-lang">${f.lang||'text'}</span>
+            <div class="code-file-actions">
+              <button class="code-file-btn" title="Copy code" onclick="copyCode(${idx})">⎘ copy</button>
+              <button class="code-file-btn" title="Download" onclick="downloadFile(${idx})">↓ dl</button>
+              <button class="code-file-btn" title="Delete" onclick="deleteAttach(event,${idx})" style="color:var(--red)">✕</button>
+            </div>
+          </div>
+          <div class="code-file-body">${esc2(f.data)}</div>
+        </div>`;
+      }).join('')}
+    </div>`;
+  }
+
+  scroll.innerHTML=html;
+}
+
+function esc2(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function codeIcon(lang){
+  const m={py:'🐍',js:'🟨',ts:'🔷',jsx:'⚛',tsx:'⚛',json:'{}',yaml:'📋',yml:'📋',sh:'🖥',bash:'🖥',cpp:'⚙',c:'⚙',java:'☕',rs:'🦀',go:'🐹',sql:'🗃',html:'🌐',css:'🎨',md:'📝'};
+  return m[lang]||'📄';
+}
+
+// ── Upload handlers ───────────────────────────────────────────────────────────
+function handleImageUpload(files){
+  if(!currentKey){showToast('Select a topic first','err');return;}
+  const arr=[...files];
+  let done=0;
+  arr.forEach(file=>{
+    if(!file.type.startsWith('image/')){showToast(`${file.name} is not an image`,'err');return;}
+    if(file.size>4*1024*1024){showToast(`${file.name} is too large (max 4MB)`,'err');return;}
+    const r=new FileReader();
+    r.onload=e=>{
+      const items=getAttachments();
+      items.push({type:'image',name:file.name,data:e.target.result});
+      setAttachments(items);
+      done++;
+      if(done===arr.length){renderAttachPanel();showToast(`${done} image${done>1?'s':''} added ✓`,'ok');}
+    };
+    r.readAsDataURL(file);
+  });
+  document.getElementById('img-input').value='';
+}
+
+function handleCodeUpload(files){
+  if(!currentKey){showToast('Select a topic first','err');return;}
+  const arr=[...files];
+  let done=0;
+  arr.forEach(file=>{
+    if(file.size>500*1024){showToast(`${file.name} is too large (max 500KB)`,'err');return;}
+    const r=new FileReader();
+    r.onload=e=>{
+      const ext=file.name.split('.').pop().toLowerCase();
+      const items=getAttachments();
+      items.push({type:'code',name:file.name,data:e.target.result,lang:ext});
+      setAttachments(items);
+      done++;
+      if(done===arr.length){renderAttachPanel();showToast(`${done} code file${done>1?'s':''} added ✓`,'ok');}
+    };
+    r.readAsText(file);
+  });
+  document.getElementById('code-input').value='';
+}
+
+// ── Delete ────────────────────────────────────────────────────────────────────
+function deleteAttach(e,idx){
+  e.stopPropagation();
+  const items=getAttachments();
+  const f=items[idx];
+  if(!f||!confirm(`Delete "${f.name}"?`)) return;
+  items.splice(idx,1);
+  setAttachments(items);
+  renderAttachPanel();
+  showToast('Deleted','ok');
+}
+
+// ── Copy / download code ──────────────────────────────────────────────────────
+function copyCode(idx){
+  const f=getAttachments()[idx];
+  if(!f) return;
+  navigator.clipboard.writeText(f.data).then(()=>showToast('Copied to clipboard ✓','ok'));
+}
+function downloadFile(idx){
+  const f=getAttachments()[idx];
+  if(!f) return;
+  const a=document.createElement('a');
+  const isImg=f.type==='image';
+  if(isImg){a.href=f.data;}
+  else{a.href=URL.createObjectURL(new Blob([f.data],{type:'text/plain'}));}
+  a.download=f.name; a.click();
+  if(!isImg) URL.revokeObjectURL(a.href);
+}
+
+// ── Lightbox ──────────────────────────────────────────────────────────────────
+function openLightbox(idx){
+  const f=getAttachments()[idx];
+  if(!f||f.type!=='image') return;
+  document.getElementById('lightbox-img').src=f.data;
+  document.getElementById('lightbox-name').textContent=f.name;
+  document.getElementById('lightbox').classList.add('open');
+}
+function closeLightbox(e){
+  if(e) e.stopPropagation();
+  document.getElementById('lightbox').classList.remove('open');
+}
+
+// ── Drag-and-drop onto editor pane ────────────────────────────────────────────
+(function(){
+  const ep=document.getElementById('editor-pane');
+  const ov=document.getElementById('drop-overlay');
+  let dragCnt=0;
+  ep.addEventListener('dragenter',e=>{e.preventDefault();dragCnt++;ov.style.display='flex';});
+  ep.addEventListener('dragleave',e=>{dragCnt--;if(dragCnt<=0){dragCnt=0;ov.style.display='none';}});
+  ep.addEventListener('dragover',e=>{e.preventDefault();});
+  ep.addEventListener('drop',e=>{
+    e.preventDefault();dragCnt=0;ov.style.display='none';
+    if(!currentKey){showToast('Select a topic first','err');return;}
+    const files=[...e.dataTransfer.files];
+    const imgs=files.filter(f=>f.type.startsWith('image/'));
+    const codes=files.filter(f=>!f.type.startsWith('image/'));
+    if(imgs.length) handleImageUpload(imgs);
+    if(codes.length) handleCodeUpload(codes);
+  });
+})();
+
+// ── Patch selectTopic to also load attachments ────────────────────────────────
+const _origSelectTopic = selectTopic;
+selectTopic = function(phaseId, topic, key, color, phaseLabel){
+  _origSelectTopic(phaseId, topic, key, color, phaseLabel);
+  renderAttachPanel();
+};
+
+// ── Patch syncToGithub to include attachments in the save payload ─────────────
+const _origSync = syncToGithub;
+syncToGithub = async function(){
+  // save current note text first
+  saveCurrentNote();
+  // build merged payload: notes + donePractice + attachments
+  const cfg=window.APP_CONFIG||{};
+  if(!cfg.ghConfigured){showToast('Configure GitHub secrets first','err');return;}
+  const btn=document.getElementById('sync-btn');
+  btn.disabled=true;btn.innerHTML='<span class="spinner"></span> Saving…';
+  document.getElementById('sync-status').textContent='Saving to GitHub…';
+  try{
+    const payload={
+      notes:{...notes, __donePractice__:donePractice, __attachments__:attachments},
+      sha:ghSha
+    };
+    const r=await fetch(`${cfg.streamlitBase}?action=save`,{
+      method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)
+    });
+    const d=await r.json();
+    if(d.ok){showToast(d.msg||'Saved ✓','ok');document.getElementById('sync-status').textContent='✓ Synced to GitHub';}
+    else{showToast(d.msg||'Save failed','err');document.getElementById('sync-status').textContent='Save failed';}
+  }catch(e){showToast('Network error','err');document.getElementById('sync-status').textContent='Network error';}
+  btn.disabled=false;btn.innerHTML='<span>⟳</span> Save to GitHub';
+};
+
+// ── Patch loadFromGithub to restore attachments ───────────────────────────────
+const _origLoad = loadFromGithub;
+loadFromGithub = async function(){
+  await _origLoad();
+  if(notes.__attachments__){ attachments=notes.__attachments__; delete notes.__attachments__; }
+  if(currentKey) renderAttachPanel();
+};
+
+// ── Show attach panel add-buttons even when empty (after topic selected) ──────
+const _origShow = show;
+show = function(mode){
+  _origShow(mode);
+  if(mode==='notes'){
+    document.getElementById('attach-panel').classList.add('visible');
+    renderAttachPanel();
+  } else {
+    document.getElementById('attach-panel').classList.remove('visible');
+  }
+};
 </script>
 </body>
 </html>
