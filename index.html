@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>GenAI Notes</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,400&family=Syne:wght@400;500;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet"/>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<style>
+:root{
+  --bg:#0d0f14;--bg2:#13161d;--bg3:#1a1d26;
+  --border:#ffffff12;--border2:#ffffff20;
+  --text:#e8eaf0;--text2:#9298ab;--text3:#5c6275;
+  --accent:#7c6ef7;--accent2:#5b4fd4;
+  --green:#3dd68c;--amber:#f59e0b;--red:#ef4444;--cyan:#38bdf8;
+  --radius:10px;--radius-lg:16px;
+  --font-head:'Syne',sans-serif;
+  --font-body:'DM Sans',sans-serif;
+  --font-mono:'DM Mono',monospace;
+  --sidebar:268px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--font-body);font-size:14px;overflow:hidden}
+#app{display:flex;height:100vh;overflow:hidden}
+#sidebar{width:var(--sidebar);min-width:var(--sidebar);background:var(--bg2);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden}
+#main{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.sidebar-header{padding:14px 14px 10px;border-bottom:1px solid var(--border);flex-shrink:0}
+.logo{font-family:var(--font-head);font-size:17px;font-weight:800;letter-spacing:-.5px;background:linear-gradient(135deg,#7c6ef7,#38bdf8);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.logo-sub{font-size:10px;color:var(--text3);margin-top:2px;font-family:var(--font-mono)}
+.tab-bar{display:flex;border-bottom:1px solid var(--border);flex-shrink:0}
+.tab-btn{flex:1;padding:8px 4px;background:none;border:none;color:var(--text3);font-family:var(--font-head);font-size:11px;font-weight:600;cursor:pointer;border-bottom:2px solid transparent;transition:all .15s}
+.tab-btn:hover{color:var(--text2)}
+.tab-btn.active{color:var(--accent);border-bottom-color:var(--accent)}
+.search-wrap{padding:8px 10px 0;position:relative;flex-shrink:0}
+.search-icon{position:absolute;left:18px;top:16px;color:var(--text3);font-size:12px;pointer-events:none}
+#search{width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);padding:6px 10px 6px 28px;color:var(--text);font-family:var(--font-body);font-size:12px;outline:none}
+#search:focus{border-color:var(--accent)}
+.sidebar-scroll{flex:1;overflow-y:auto;padding:6px 0}
+.sidebar-scroll::-webkit-scrollbar{width:3px}
+.sidebar-scroll::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
+.phase-item{border-bottom:1px solid var(--border)}
+.phase-btn{width:100%;display:flex;align-items:center;gap:7px;padding:8px 12px;background:none;border:none;color:var(--text2);cursor:pointer;text-align:left;font-family:var(--font-body);font-size:12px;font-weight:500;transition:all .15s}
+.phase-btn:hover,.phase-btn.active{background:var(--bg3);color:var(--text)}
+.phase-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.phase-chevron{margin-left:auto;font-size:9px;transition:transform .2s;color:var(--text3)}
+.phase-btn.open .phase-chevron{transform:rotate(90deg)}
+.phase-topics{display:none;padding:0 0 4px 0}
+.phase-btn.open + .phase-progress + .phase-topics,.phase-btn.open + .phase-topics{display:block}
+.topic-btn{width:100%;padding:5px 12px 5px 28px;background:none;border:none;color:var(--text3);cursor:pointer;text-align:left;font-family:var(--font-body);font-size:11.5px;transition:all .15s;display:flex;align-items:center;gap:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.topic-btn:hover{color:var(--text2);background:var(--bg3)}
+.topic-btn.active{color:var(--accent);background:#7c6ef710}
+.topic-btn.has-note::before{content:'';width:5px;height:5px;border-radius:50%;background:var(--green);flex-shrink:0;min-width:5px}
+.topic-btn.done-practice::before{content:'';width:5px;height:5px;border-radius:50%;background:var(--amber);flex-shrink:0;min-width:5px}
+.sec-label{padding:4px 12px 2px 28px;font-size:10px;color:var(--text3);font-family:var(--font-mono);text-transform:uppercase;letter-spacing:.06em}
+.phase-progress{padding:0 12px 4px}
+.p-track{height:2px;background:var(--border);border-radius:1px;overflow:hidden}
+.p-fill{height:100%;border-radius:1px;transition:width .4s}
+.sidebar-footer{padding:8px 10px;border-top:1px solid var(--border);flex-shrink:0}
+.sync-btn{width:100%;padding:7px;background:var(--accent2);color:#fff;border:none;border-radius:var(--radius);font-family:var(--font-head);font-weight:600;font-size:11px;cursor:pointer;transition:all .15s;display:flex;align-items:center;justify-content:center;gap:5px}
+.sync-btn:hover{background:var(--accent)}
+.sync-btn:disabled{opacity:.5;cursor:default}
+.sync-status{font-size:10px;color:var(--text3);text-align:center;margin-top:5px;min-height:13px;font-family:var(--font-mono)}
+#header{padding:12px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;flex-shrink:0;background:var(--bg2)}
+#topic-title{font-family:var(--font-head);font-size:17px;font-weight:700;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#topic-phase-tag{font-size:10px;padding:3px 9px;border-radius:20px;font-family:var(--font-mono);flex-shrink:0;white-space:nowrap}
+.header-btns{display:flex;gap:7px;flex-shrink:0}
+.btn{padding:6px 12px;border-radius:var(--radius);border:none;font-family:var(--font-head);font-weight:600;font-size:11px;cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:4px}
+.btn-revise{background:linear-gradient(135deg,#7c6ef7,#38bdf8);color:#fff}
+.btn-revise:hover{opacity:.85}
+.btn-save{background:var(--green);color:#000}
+.btn-save:hover{opacity:.85}
+.btn-clear{background:var(--bg3);color:var(--text2);border:1px solid var(--border)}
+.btn-clear:hover{border-color:var(--red);color:var(--red)}
+.btn-done{background:var(--amber);color:#000}
+.btn-done:hover{opacity:.85}
+#content{flex:1;display:flex;overflow:hidden}
+#editor-pane{flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0}
+.pane-label{padding:7px 14px;font-size:10px;font-family:var(--font-mono);color:var(--text3);background:var(--bg2);border-bottom:1px solid var(--border);flex-shrink:0;letter-spacing:.05em;text-transform:uppercase}
+#note-editor{flex:1;padding:14px;background:var(--bg);color:var(--text);font-family:var(--font-mono);font-size:13px;line-height:1.7;border:none;outline:none;resize:none;width:100%}
+#note-editor::placeholder{color:var(--text3)}
+#practice-pane{flex:1;flex-direction:column;overflow:hidden;min-width:0;display:none}
+#practice-body{flex:1;overflow-y:auto;padding:18px 22px;line-height:1.7}
+#practice-body::-webkit-scrollbar{width:3px}
+#practice-body::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
+#revision-pane{width:370px;min-width:310px;border-left:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;background:var(--bg2)}
+#revision-body{flex:1;overflow-y:auto;padding:13px;line-height:1.7}
+#revision-body::-webkit-scrollbar{width:3px}
+#revision-body::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
+.revision-placeholder{color:var(--text3);font-style:italic;font-size:12px;text-align:center;padding-top:28px}
+.revision-content h2{font-family:var(--font-head);font-size:14px;color:var(--accent);margin:10px 0 5px}
+.revision-content h3{font-family:var(--font-head);font-size:13px;color:var(--text2);margin:8px 0 4px}
+.revision-content p{color:var(--text2);font-size:12.5px;margin-bottom:7px}
+.revision-content ul{padding-left:14px;color:var(--text2);font-size:12.5px}
+.revision-content li{margin-bottom:3px}
+.revision-content strong{color:var(--text);font-weight:500}
+.revision-content code{font-family:var(--font-mono);background:var(--bg3);padding:1px 5px;border-radius:4px;font-size:11px;color:var(--accent)}
+.revision-content blockquote{border-left:3px solid var(--accent);padding-left:10px;color:var(--text3);margin:8px 0;font-size:12px}
+/* practice detail */
+.pc-section{margin-bottom:20px}
+.pc-section-title{font-family:var(--font-head);font-size:12px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.08em;margin-bottom:9px;display:flex;align-items:center;gap:7px}
+.pc-section-title::after{content:'';flex:1;height:1px;background:var(--border)}
+.pc-desc{font-size:13px;color:var(--text2);line-height:1.7;margin-bottom:12px}
+.pc-tag{display:inline-block;font-size:10px;font-family:var(--font-mono);padding:2px 7px;border-radius:12px;margin:2px 2px 2px 0}
+.pc-tag.skill{background:#7c6ef720;color:#9b8ef9;border:1px solid #7c6ef730}
+.pc-tag.tool{background:#38bdf820;color:#67d8f7;border:1px solid #38bdf830}
+.pc-tag.diff-easy{background:#3dd68c20;color:#3dd68c;border:1px solid #3dd68c30}
+.pc-tag.diff-med{background:#f59e0b20;color:#f59e0b;border:1px solid #f59e0b30}
+.pc-tag.diff-hard{background:#ef444420;color:#ef4444;border:1px solid #ef444430}
+.pc-tag.time{background:#ffffff0a;color:var(--text3);border:1px solid var(--border)}
+.step-list{list-style:none;padding:0;counter-reset:steps}
+.step-list li{padding:6px 0 6px 24px;position:relative;font-size:12.5px;color:var(--text2);border-bottom:1px solid var(--border);line-height:1.6}
+.step-list li:last-child{border-bottom:none}
+.step-list li::before{content:counter(steps);counter-increment:steps;position:absolute;left:0;top:7px;width:16px;height:16px;border-radius:50%;background:var(--accent2);color:#fff;font-size:9px;font-family:var(--font-mono);display:flex;align-items:center;justify-content:center}
+.concept-chip{display:inline-flex;align-items:center;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:3px 9px;font-size:11px;color:var(--text2);margin:2px;font-family:var(--font-mono)}
+.outcome-item{display:flex;align-items:flex-start;gap:7px;padding:4px 0;font-size:12.5px;color:var(--text2)}
+.outcome-item::before{content:'✓';color:var(--green);font-size:12px;flex-shrink:0;margin-top:1px}
+.code-block{background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);padding:10px 12px;font-family:var(--font-mono);font-size:11px;color:var(--cyan);line-height:1.6;overflow-x:auto;margin:6px 0;white-space:pre}
+.challenge-box{background:#7c6ef710;border:1px solid #7c6ef730;border-radius:var(--radius);padding:9px 12px;margin:6px 0;font-size:12.5px;color:var(--text2);line-height:1.6}
+.challenge-box strong{color:var(--accent)}
+/* welcome */
+#welcome{flex:1;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:10px;padding:24px;overflow-y:auto}
+.welcome-icon{font-size:40px;opacity:.25}
+.welcome-title{font-family:var(--font-head);font-size:20px;font-weight:800;color:var(--text2);text-align:center}
+.welcome-sub{font-size:12.5px;color:var(--text3);text-align:center;max-width:320px;line-height:1.6}
+.welcome-stats{display:flex;gap:10px;margin-top:8px;flex-wrap:wrap;justify-content:center}
+.wstat{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:8px 14px;text-align:center}
+.wstat-n{font-family:var(--font-head);font-size:20px;font-weight:800;color:var(--accent)}
+.wstat-l{font-size:10px;color:var(--text3);margin-top:2px;font-family:var(--font-mono)}
+.spinner{display:inline-block;width:13px;height:13px;border:2px solid #ffffff40;border-top-color:#fff;border-radius:50%;animation:spin .6s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+#toast{position:fixed;bottom:14px;right:14px;background:var(--bg3);border:1px solid var(--border2);color:var(--text);padding:8px 13px;border-radius:var(--radius);font-size:12px;font-family:var(--font-mono);opacity:0;transform:translateY(6px);transition:all .3s;pointer-events:none;z-index:999}
+#toast.show{opacity:1;transform:translateY(0)}
+#toast.ok{border-color:var(--green);color:var(--green)}
+#toast.err{border-color:var(--red);color:var(--red)}
+::-webkit-scrollbar{width:4px;height:4px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
+</style>
+</head>
+<body>
+<div id="app">
+<div id="sidebar">
+  <div class="sidebar-header">
+    <div class="logo">🧠 GenAI Notes</div>
+    <div class="logo-sub">// expert knowledge base + practice lab</div>
+  </div>
+  <div class="tab-bar">
+    <button class="tab-btn active" id="tab-notes" onclick="switchTab('notes')">📚 NOTES</button>
+    <button class="tab-btn" id="tab-practice" onclick="switchTab('practice')">⚡ PRACTICE</button>
+  </div>
+  <div class="search-wrap">
+    <span class="search-icon">⌕</span>
+    <input id="search" placeholder="Search…" oninput="handleSearch(this.value)"/>
+  </div>
+  <div class="sidebar-scroll" id="sidebar-scroll"></div>
+  <div class="sidebar-footer">
+    <button class="sync-btn" onclick="syncToGithub()" id="sync-btn"><span id="sync-icon">⟳</span> Save to GitHub</button>
+    <div class="sync-status" id="sync-status"></div>
+  </div>
+</div>
+<div id="main">
+  <div id="header" style="display:none">
+    <div id="topic-phase-tag"></div>
+    <div id="topic-title"></div>
+    <div class="header-btns" id="header-btns"></div>
+  </div>
+  <div id="welcome">
+    <div class="welcome-icon">⚡</div>
+    <div class="welcome-title">Pick a topic to begin</div>
+    <div class="welcome-sub">Use <strong>Notes</strong> to write & AI-revise theory. Use <strong>Practice</strong> for hands-on projects with step-by-step guides and AI help.</div>
+    <div class="welcome-stats">
+      <div class="wstat"><div class="wstat-n" id="stat-total">0</div><div class="wstat-l">topics</div></div>
+      <div class="wstat"><div class="wstat-n" id="stat-noted">0</div><div class="wstat-l">noted</div></div>
+      <div class="wstat"><div class="wstat-n" id="stat-projects">0</div><div class="wstat-l">projects</div></div>
+      <div class="wstat"><div class="wstat-n" id="stat-done">0</div><div class="wstat-l">done</div></div>
+    </div>
+  </div>
+  <div id="content" style="display:none">
+    <div id="editor-pane">
+      <div class="pane-label">📝 your notes — markdown supported</div>
+      <textarea id="note-editor" placeholder="Write notes here…&#10;&#10;Tips:&#10;• Explain it in your own words&#10;• Add code snippets and examples&#10;• Note gotchas and common mistakes&#10;• Then click ✦ AI Revise for a sharp summary"></textarea>
+    </div>
+    <div id="practice-pane">
+      <div class="pane-label" id="practice-pane-label">⚡ hands-on project</div>
+      <div id="practice-body"></div>
+    </div>
+    <div id="revision-pane">
+      <div class="pane-label" id="rev-pane-label">✦ ai panel</div>
+      <div id="revision-body"><div class="revision-placeholder">Select a topic then click ✦ AI Revise.</div></div>
+    </div>
+  </div>
+</div>
+</div>
+<div id="toast"></div>
+<script>
+// ─── NOTES DATA ───────────────────────────────────────────────────────────────
+const PHASES=[{id:"p1",label:"Phase 1",title:"Math & ML Foundations",color:"#7c6ef7",sections:[{title:"Linear Algebra",topics:["Vectors & matrices","Matrix multiplication","Eigenvalues & eigenvectors","SVD","Dot products","Norms & distances"]},{title:"Calculus",topics:["Derivatives & gradients","Chain rule","Partial derivatives","Jacobians","Taylor series"]},{title:"Probability & Statistics",topics:["Probability distributions","Bayes theorem","MLE & MAP","KL divergence","Entropy & information theory","Gaussian processes"]},{title:"Classical ML",topics:["Linear / logistic regression","Decision trees & ensembles","SVMs","Dimensionality reduction (PCA, t-SNE)","Clustering (K-means, DBSCAN)","Bias-variance tradeoff","Cross-validation"]}]},{id:"p2",label:"Phase 2",title:"Deep Learning Core",color:"#38bdf8",sections:[{title:"Neural Network Basics",topics:["Perceptrons & MLPs","Activation functions","Forward & backpropagation","Loss functions","Weight initialization","Batch normalization","Dropout & regularization"]},{title:"Optimizers",topics:["SGD & momentum","Adam / AdamW","Learning rate schedules","Gradient clipping","Mixed precision training"]},{title:"CNNs",topics:["Convolution operations","Pooling layers","ResNet / VGG / EfficientNet","Object detection (YOLO, RCNN)","Image segmentation"]},{title:"RNNs & Sequence Models",topics:["Vanilla RNNs","LSTMs & GRUs","Vanishing gradient problem","Bidirectional RNNs","Sequence-to-sequence models","Attention (pre-transformer)"]},{title:"Frameworks",topics:["PyTorch (must-have)","TensorFlow / Keras","JAX","Hugging Face ecosystem"]}]},{id:"p3",label:"Phase 3",title:"Generative Architectures",color:"#3dd68c",sections:[{title:"Transformers",topics:["Self-attention mechanism","Multi-head attention","Positional encoding","Encoder-decoder architecture","Masked attention (causal)","KV-cache","Flash attention","Sparse attention","Rotary position embeddings (RoPE)"]},{title:"Autoencoders & VAEs",topics:["Undercomplete autoencoders","Denoising autoencoders","Variational inference","ELBO loss","Latent space navigation","VQ-VAE"]},{title:"GANs",topics:["Generator & discriminator","GAN training dynamics","Mode collapse & mitigation","Wasserstein GAN","Progressive GAN","StyleGAN 2/3","Conditional GANs","CycleGAN"]},{title:"Diffusion Models",topics:["Forward diffusion process","Reverse diffusion (DDPM)","DDIM sampling","Score matching","CFG (classifier-free guidance)","Stable Diffusion architecture","SDXL & SD3","Consistency models","Flow matching"]},{title:"State Space Models",topics:["Mamba / SSM basics","S4 model","H3 model","Selective state spaces","SSM vs Transformer comparison"]}]},{id:"p4",label:"Phase 4",title:"Large Language Models",color:"#f59e0b",sections:[{title:"LLM Fundamentals",topics:["Tokenization (BPE, WordPiece, SentencePiece)","Embedding layers","Next-token prediction","Perplexity metric","Scaling laws","Context window mechanics","Temperature & sampling strategies"]},{title:"Pre-training",topics:["Causal language modeling","Masked language modeling (BERT-style)","Data curation & preprocessing","Distributed pre-training","Checkpointing strategies","Emergent capabilities"]},{title:"Key LLM Families",topics:["GPT-2 / GPT-3 / GPT-4","LLaMA 1/2/3","Mistral & Mixtral (MoE)","Gemma","Claude architecture","Gemini","Phi series (small LLMs)","Qwen / DeepSeek"]},{title:"Architecture Variants",topics:["Encoder-only (BERT, RoBERTa)","Decoder-only (GPT)","Encoder-decoder (T5, BART)","Mixture of Experts (MoE)","Sparse transformers","Long-context models (Gemini 1.5)"]}]},{id:"p5",label:"Phase 5",title:"Training & Fine-Tuning",color:"#ef6c47",sections:[{title:"Fine-Tuning Methods",topics:["Full fine-tuning","LoRA (Low-Rank Adaptation)","QLoRA","Prefix tuning","Prompt tuning","Adapter layers","PEFT library usage"]},{title:"Instruction Tuning",topics:["Instruction datasets (Alpaca, FLAN)","Chat templates","System prompt design","Multi-turn fine-tuning","Self-instruct method"]},{title:"RLHF & Alignment",topics:["Reward model training","Proximal Policy Optimization (PPO)","Direct Preference Optimization (DPO)","Constitutional AI","RLAIF","GRPO (DeepSeek-R1 style)","RLHF vs DPO tradeoffs"]},{title:"Distributed Training",topics:["Data parallelism","Model parallelism","Pipeline parallelism","Tensor parallelism","Zero Redundancy Optimizer (ZeRO)","DeepSpeed","FSDP (PyTorch)","Megatron-LM"]},{title:"Efficiency",topics:["Quantization (INT8, INT4, GPTQ)","Pruning & sparsity","Knowledge distillation","Flash attention 2","Gradient checkpointing","Mixed precision (BF16, FP16)"]}]},{id:"p6",label:"Phase 6",title:"Multimodal & Specialized",color:"#e879f9",sections:[{title:"Vision-Language Models",topics:["CLIP (contrastive learning)","ALIGN","LLaVA","Flamingo / IDEFICS","GPT-4V","Gemini Vision","PaLI-X","InstructBLIP"]},{title:"Text-to-Image",topics:["Stable Diffusion (deep dive)","DALL·E 3","Midjourney internals","ControlNet","IP-Adapter","DreamBooth fine-tuning","Textual inversion"]},{title:"Video Generation",topics:["Sora architecture overview","Video diffusion models","AnimateDiff","CogVideoX","Temporal consistency","Motion conditioning"]},{title:"Audio & Speech",topics:["Text-to-speech (TTS) models","Whisper (ASR)","MusicGen","AudioCraft","Voice cloning","Neural codec language models (VALL-E)"]},{title:"Code Models",topics:["Codex / GitHub Copilot","StarCoder","Code Llama","DeepSeek-Coder","Fill-in-the-middle (FIM)","Unit test generation"]}]},{id:"p7",label:"Phase 7",title:"Prompting & RAG",color:"#fb7185",sections:[{title:"Prompt Engineering",topics:["Zero-shot prompting","Few-shot prompting","Chain-of-thought (CoT)","Tree-of-thought (ToT)","Self-consistency","Least-to-most prompting","ReAct prompting","Structured output prompting"]},{title:"Embeddings & Vector Search",topics:["Embedding models (text-embedding-3, E5, BGE)","Cosine similarity","FAISS","Pinecone","Weaviate","Chroma","Qdrant","ANN algorithms (HNSW, IVF)"]},{title:"RAG",topics:["Naive RAG","Chunking strategies","Hybrid search (BM25 + dense)","Re-ranking (Cohere, Colbert)","Advanced RAG (query expansion, HyDE)","Self-RAG","GraphRAG","Contextual retrieval"]},{title:"Structured Generation",topics:["JSON mode","Function calling / tool use","Instructor library","Outlines library","Constrained decoding (grammar-based)"]}]},{id:"p8",label:"Phase 8",title:"Agents & Agentic Systems",color:"#a3e635",sections:[{title:"Agent Fundamentals",topics:["ReAct framework","Tool use & function calling","Planning & reasoning loops","Memory types (episodic, semantic, procedural)","Agent evaluation"]},{title:"Frameworks",topics:["LangChain (chains, agents)","LlamaIndex (data agents)","AutoGen","CrewAI","LangGraph (stateful agents)","Pydantic AI","Smolagents"]},{title:"Memory Systems",topics:["Short-term (context window)","Long-term (vector DB, knowledge graphs)","Working memory patterns","Memory compression","MemGPT architecture"]},{title:"Multi-Agent Systems",topics:["Agent orchestration","Supervisor pattern","Swarm architecture","Task decomposition","Inter-agent communication","Hierarchical agents"]},{title:"Agentic Patterns",topics:["Map-reduce agent","Reflection pattern","Plan-and-execute","Self-debugging agents","Human-in-the-loop","Computer use / browser agents"]}]},{id:"p9",label:"Phase 9",title:"Deployment & MLOps",color:"#94a3b8",sections:[{title:"Inference & Serving",topics:["vLLM (PagedAttention)","TGI (Text Generation Inference)","Triton Inference Server","ONNX Runtime","TensorRT-LLM","OpenAI API-compatible serving","Batching strategies"]},{title:"Optimization for Inference",topics:["KV cache management","Speculative decoding","Continuous batching","Prefix caching","AWQ quantization","GPTQ quantization","ExLlamaV2"]},{title:"Evaluation",topics:["BLEU & ROUGE","BERTScore","FID (image generation)","MMLU / HellaSwag / ARC benchmarks","LLM-as-judge","RAGAS (RAG eval)","Human eval","Red-teaming"]},{title:"MLOps for GenAI",topics:["Weights & Biases","MLflow","Experiment tracking","Model versioning","Data versioning (DVC)","CI/CD for ML","A/B testing LLMs","Prompt versioning"]},{title:"Cloud & Infrastructure",topics:["AWS SageMaker","GCP Vertex AI","Azure ML","Lambda Labs / RunPod","Kubernetes for ML","Cost optimization"]}]},{id:"p10",label:"Phase 10",title:"Safety & Frontier Research",color:"#f97316",sections:[{title:"Safety & Alignment",topics:["Hallucination types & mitigation","Factuality & grounding","Jailbreaking & prompt injection","Constitutional AI","RLHF alignment","Scalable oversight","Mechanistic interpretability","Activation patching"]},{title:"Bias & Fairness",topics:["Representation bias in training data","Toxicity detection","Fairness metrics","Counterfactual fairness","Debiasing techniques","Red-teaming for bias"]},{title:"Frontier Research Areas",topics:["Test-time compute scaling","Chain-of-thought reasoning models (o1, R1)","World models","Neurosymbolic AI","Continual learning","Federated learning for LLMs","Long-context scaling","AI agents in the wild"]},{title:"Responsible AI",topics:["Data privacy & copyright","Model watermarking","Audit & governance","EU AI Act basics","NIST AI RMF","Synthetic data ethics"]}]}];
+
+// ─── PRACTICE DATA ────────────────────────────────────────────────────────────
+const PRACTICE_CATS=[
+{id:"cat-python",label:"Python Foundations",color:"#38bdf8",projects:[
+{id:"py1",title:"NumPy Neural Net from Scratch",difficulty:"medium",time:"4–6 hrs",skills:["NumPy","Backprop","Linear Algebra"],tools:["Python","NumPy","Matplotlib"],desc:"Build a 2-layer neural network from pure NumPy — no PyTorch, no Keras. Implement forward pass, loss, backpropagation, and gradient descent by hand. This is the single best exercise to cement your understanding of how neural nets actually work.",steps:["Implement matrix multiply & sigmoid/ReLU activation functions","Build a forward pass that computes activations layer by layer","Implement MSE and cross-entropy loss from scratch","Derive and code the backprop equations manually using chain rule","Run gradient descent — watch loss drop on XOR and MNIST","Add mini-batch support and learning rate decay","Visualise decision boundaries and loss curves with Matplotlib"],concepts:["Chain rule","Jacobian","Gradient flow","Weight matrices","Bias terms","Loss landscape"],outcomes:["Deep intuition for backprop no framework gives you","Confidence to debug any gradient issue","Solid NumPy vectorisation skill"],starter:"import numpy as np\n\ndef sigmoid(z): return 1 / (1 + np.exp(-z))\n\nclass TwoLayerNet:\n    def __init__(self, n_in, n_hidden, n_out):\n        self.W1 = np.random.randn(n_in, n_hidden) * 0.01\n        self.b1 = np.zeros((1, n_hidden))\n        self.W2 = np.random.randn(n_hidden, n_out) * 0.01\n        self.b2 = np.zeros((1, n_out))\n\n    def forward(self, X):\n        # TODO: implement layer-by-layer computation\n        pass\n\n    def backward(self, X, y, lr=0.01):\n        # TODO: derive and implement backprop\n        pass",challenge:"After it works on MNIST, add a 3rd hidden layer and batch normalisation — purely in NumPy."},
+{id:"py2",title:"Async LLM Batch Caller with Rate Limiting",difficulty:"medium",time:"3–4 hrs",skills:["asyncio","Concurrency","Python"],tools:["Python","asyncio","httpx"],desc:"Most AI apps hammer APIs concurrently. Build a concurrent LLM batch caller that sends 50 prompts in parallel, handles rate limits with exponential backoff, and streams results as they arrive. The foundation of every production AI pipeline.",steps:["Understand the event loop, coroutines, async/await syntax","Build a simple async function that calls an LLM API with httpx","Use asyncio.gather() to fan out 50 prompts in parallel","Implement a semaphore to cap concurrency at N requests","Add exponential backoff with jitter for 429 rate-limit errors","Stream SSE (server-sent events) responses using async generators","Benchmark: compare serial vs parallel throughput"],concepts:["Event loop","Coroutines","Task scheduling","Semaphore","Backpressure","Streaming SSE"],outcomes:["Build fast LLM batch pipelines","Handle rate limits gracefully","Understand async patterns used in every AI framework"],starter:"import asyncio, httpx\n\nasync def call_llm(client, prompt: str, semaphore: asyncio.Semaphore):\n    async with semaphore:\n        # TODO: POST to LLM API, handle 429 with retry\n        pass\n\nasync def main(prompts: list[str]):\n    sem = asyncio.Semaphore(10)  # max 10 concurrent\n    async with httpx.AsyncClient() as client:\n        tasks = [call_llm(client, p, sem) for p in prompts]\n        results = await asyncio.gather(*tasks, return_exceptions=True)\n    return results",challenge:"Add a live progress bar using rich that updates as each response arrives."},
+{id:"py3",title:"ML Utility Decorators & Context Managers",difficulty:"easy",time:"2 hrs",skills:["Python","Decorators","Profiling"],tools:["Python","functools","contextlib"],desc:"Write production-quality Python utilities used in every real ML codebase: timing decorators, retry wrappers, GPU memory trackers, and context managers for experiment state — the patterns you see in PyTorch, HuggingFace, and LangChain source code.",steps:["Build @timer decorator that logs function execution time","Build @retry(n, exceptions) with exponential backoff","Create a no_grad context manager wrapper for PyTorch","Write an ExperimentContext that sets seeds and logs config","Implement @cache_to_disk for expensive computations","Combine into a single ml_utils.py module with unit tests"],concepts:["First-class functions","Closures","functools.wraps","__enter__/__exit__","Generator-based context managers"],outcomes:["Write clean reusable ML utility code","Understand patterns behind HuggingFace/LangChain internals","Debug production ML pipelines faster"],starter:"import functools, time\n\ndef timer(func):\n    @functools.wraps(func)\n    def wrapper(*args, **kwargs):\n        start = time.perf_counter()\n        result = func(*args, **kwargs)\n        print(f'{func.__name__} took {time.perf_counter()-start:.3f}s')\n        return result\n    return wrapper\n\ndef retry(max_attempts=3, exceptions=(Exception,)):\n    def decorator(func):\n        # TODO: implement with backoff\n        pass\n    return decorator",challenge:"Make @retry work with both sync and async functions using inspect.iscoroutinefunction."}
+]},
+{id:"cat-pytorch",label:"PyTorch & Training",color:"#f59e0b",projects:[
+{id:"pt1",title:"Train a Mini-GPT on Custom Text",difficulty:"hard",time:"1–2 days",skills:["PyTorch","Transformers","LLM Pre-training"],tools:["PyTorch","tiktoken","Weights & Biases","Colab/RunPod"],desc:"Implement a mini GPT from scratch — multi-head causal attention, transformer blocks, BPE tokenizer, and training loop — then train it on a domain-specific dataset of your choice. The canonical hands-on LLM project. Extend with RoPE and KV-cache.",steps:["Implement multi-head causal self-attention as a PyTorch nn.Module","Build the transformer block: attention + MLP + LayerNorm with pre-norm","Stack N blocks into a GPT model with token + positional embeddings","Write a data loader with sliding window and BPE tokenization via tiktoken","Implement training loop with gradient accumulation + cosine LR schedule","Log loss curves, grad norms, and sample generations to W&B","Replace learned position embeddings with RoPE (rotary embeddings)","Train on 100MB of text on a free Colab T4 GPU","Generate text and measure perplexity on a held-out set"],concepts:["Causal masking","RoPE","Gradient accumulation","LR warmup","BPE tokenization","Perplexity","KV-cache"],outcomes:["Deep understanding of every LLM component","Ability to modify any open-source LLM architecture","Real GPU training experience"],starter:"import torch, torch.nn as nn\n\nclass CausalSelfAttention(nn.Module):\n    def __init__(self, n_embd, n_head, block_size, dropout=0.1):\n        super().__init__()\n        assert n_embd % n_head == 0\n        self.n_head = n_head\n        self.n_embd = n_embd\n        self.c_attn = nn.Linear(n_embd, 3 * n_embd)  # Q, K, V\n        self.c_proj = nn.Linear(n_embd, n_embd)\n        self.register_buffer('bias',\n            torch.tril(torch.ones(block_size, block_size)))\n\n    def forward(self, x):\n        B, T, C = x.shape\n        # TODO: split Q,K,V, compute scaled dot-product\n        # attention with causal mask, reshape heads\n        pass",challenge:"Implement KV-caching for fast autoregressive inference and measure the tokens/sec speedup."},
+{id:"pt2",title:"Fine-tune LLaMA / Mistral with QLoRA",difficulty:"hard",time:"4–6 hrs",skills:["QLoRA","PEFT","Fine-tuning","HuggingFace"],tools:["transformers","peft","trl","bitsandbytes","Colab"],desc:"Fine-tune a 7B LLaMA/Mistral model on your own instruction dataset using QLoRA — the industry-standard technique for adapting LLMs on consumer hardware. Build an end-to-end pipeline from dataset prep to a merged model ready for deployment.",steps:["Prepare a 500–1000 row instruction dataset in ShareGPT/Alpaca format","Load a 7B model in 4-bit NF4 quantization with bitsandbytes","Configure LoRA: choose r, alpha, target modules (q_proj, v_proj, k_proj)","Set up SFTTrainer from trl with packing and chat template","Train for 1–3 epochs, monitor loss and grad norm with W&B","Merge LoRA adapter weights back into the base model","Evaluate: compare your fine-tuned vs base model on 20 test prompts","Push merged model to Hugging Face Hub"],concepts:["LoRA rank & alpha","NF4 quantization","SFT vs RLHF","Chat templates","Adapter merging","VRAM budgeting"],outcomes:["Domain-specific LLM fine-tuning skill","Understanding of PEFT internals","A real fine-tuned model on your HF profile"],starter:"from transformers import AutoModelForCausalLM, BitsAndBytesConfig\nfrom peft import LoraConfig, get_peft_model\n\nbnb_config = BitsAndBytesConfig(\n    load_in_4bit=True, bnb_4bit_quant_type='nf4',\n    bnb_4bit_compute_dtype='bfloat16'\n)\nmodel = AutoModelForCausalLM.from_pretrained(\n    'mistralai/Mistral-7B-v0.1',\n    quantization_config=bnb_config, device_map='auto'\n)\nlora_config = LoraConfig(\n    r=16, lora_alpha=32,\n    target_modules=['q_proj','v_proj','k_proj','o_proj'],\n    lora_dropout=0.05, bias='none', task_type='CAUSAL_LM'\n)\nmodel = get_peft_model(model, lora_config)\nmodel.print_trainable_parameters()",challenge:"After merging, quantize to GGUF and run locally with llama.cpp. Benchmark tokens/sec vs vLLM."},
+{id:"pt3",title:"DDPM Diffusion Model from Scratch",difficulty:"hard",time:"1 day",skills:["Diffusion Models","PyTorch","DDPM","UNet"],tools:["PyTorch","torchvision","matplotlib","tqdm"],desc:"Implement DDPM (Denoising Diffusion Probabilistic Models) end-to-end on MNIST/CIFAR-10. Build the noise scheduler, UNet denoiser, training loop, and reverse diffusion sampler from scratch — then extend with DDIM for 10x faster sampling.",steps:["Implement the forward process: add Gaussian noise over T timesteps with cosine schedule","Build a small UNet with sinusoidal timestep embeddings","Implement the DDPM training objective: predict the noise epsilon","Write the reverse diffusion sampling loop (Algorithm 2 from the DDPM paper)","Train on MNIST for ~50 epochs on Colab free GPU","Visualise the denoising process frame-by-frame","Implement DDIM deterministic sampling — compare at 10 vs 1000 steps","Add class conditioning for digit-specific generation"],concepts:["Markov chain","Cosine noise schedule","ELBO","Score matching","DDIM deterministic sampling","Classifier-free guidance"],outcomes:["Deep intuition for how Stable Diffusion works","Ability to read and implement diffusion papers","UNet architecture mastery"],starter:"import torch, torch.nn as nn, numpy as np\n\nclass NoiseScheduler:\n    def __init__(self, timesteps=1000):\n        self.T = timesteps\n        s = 0.008\n        t = torch.linspace(0, timesteps, timesteps+1)\n        ab = torch.cos(((t/timesteps+s)/(1+s))*torch.pi/2)**2\n        self.alphas_bar = ab / ab[0]\n        self.betas = torch.clamp(\n            1 - self.alphas_bar[1:]/self.alphas_bar[:-1], 0, 0.999)\n\n    def add_noise(self, x0, t, noise=None):\n        # q(x_t|x_0) = N(sqrt(ab_t)*x0, (1-ab_t)*I)\n        # TODO: sample using reparameterisation trick\n        pass",challenge:"Condition the model on CLIP text embeddings to build a tiny text-to-image system."}
+]},
+{id:"cat-llmapps",label:"LLM Apps & APIs",color:"#3dd68c",projects:[
+{id:"llm1",title:"Production Streaming Chatbot with Memory",difficulty:"medium",time:"4–5 hrs",skills:["LLM APIs","Streaming","Conversation Memory"],tools:["Anthropic/OpenAI SDK","FastAPI","Redis","Python"],desc:"Build a production-quality chatbot backend — not a toy demo — with SSE streaming, multi-turn conversation memory in Redis, user session management, and automatic context truncation with summarisation when the context window fills up.",steps:["Set up a FastAPI server with a POST /chat/stream endpoint","Implement SSE streaming using the Anthropic streaming SDK","Store conversation history per session_id in Redis with TTL","Implement sliding window: keep last N tokens, truncate older messages","Add system prompt injection and persona support per session","Implement token counting with tiktoken to stay under context limits","Add conversation summarisation when context gets too long","Build a minimal HTML/JS frontend that renders the SSE stream live","Add per-user rate limiting with slowapi"],concepts:["SSE streaming","Context window management","Token counting","Session state","Redis TTL","Rate limiting"],outcomes:["Backend skills to ship a real chatbot product","Understanding of context management in production","Streaming API integration experience"],starter:"from fastapi import FastAPI\nfrom fastapi.responses import StreamingResponse\nimport anthropic, redis, json\n\napp = FastAPI()\nclient = anthropic.Anthropic()\nrc = redis.Redis(decode_responses=True)\n\n@app.post('/chat/stream')\nasync def chat(session_id: str, message: str):\n    history = json.loads(rc.get(f'hist:{session_id}') or '[]')\n    history.append({'role':'user','content':message})\n    # TODO: truncate if over token limit\n    async def generate():\n        with client.messages.stream(\n            model='claude-sonnet-4-20250514',\n            max_tokens=1024, messages=history\n        ) as stream:\n            full = ''\n            for text in stream.text_stream:\n                full += text\n                yield f'data: {json.dumps({\"text\":text})}\\n\\n'\n        history.append({'role':'assistant','content':full})\n        rc.setex(f'hist:{session_id}', 3600, json.dumps(history))\n    return StreamingResponse(generate(), media_type='text/event-stream')",challenge:"Add tool use: give the chatbot a web_search tool and implement the full tool-call / tool-result loop."},
+{id:"llm2",title:"Structured Data Extraction Pipeline",difficulty:"medium",time:"3–4 hrs",skills:["Pydantic","Structured Output","LLM APIs","Data Engineering"],tools:["instructor","Pydantic","Anthropic/OpenAI","pandas"],desc:"Build a robust pipeline that extracts typed, validated JSON from unstructured text at scale — the most common real-world LLM use case. Process 1000 documents and extract clean structured data using Pydantic + Instructor with automatic retry on validation failure.",steps:["Define a Pydantic model with nested types for your target schema","Use the instructor library to patch the Anthropic/OpenAI client","Extract structured data from 10 sample documents, validate output","Add field-level validators with @field_validator for enums, dates, ranges","Build async batch processing for 1000 documents with rate limiting","Handle partial extractions and model refusals gracefully","Export results to pandas DataFrame, run quality checks","Build a simple eval: sample 50 results, measure accuracy"],concepts:["JSON Schema","Pydantic validation","Retry-on-validation-error","Tool use / function calling","Async batching","Data quality"],outcomes:["Build any data extraction pipeline in hours","Pydantic expert-level skill","Production LLM pipeline architecture knowledge"],starter:"import instructor, anthropic\nfrom pydantic import BaseModel, Field\nfrom typing import Optional\nfrom enum import Enum\n\nclient = instructor.from_anthropic(anthropic.Anthropic())\n\nclass SeniorityLevel(str, Enum):\n    JUNIOR='junior'; MID='mid'; SENIOR='senior'; STAFF='staff'\n\nclass JobPosting(BaseModel):\n    title: str\n    company: str\n    seniority: SeniorityLevel\n    required_skills: list[str]\n    salary_min: Optional[int] = None\n    salary_max: Optional[int] = None\n    remote: bool\n    years_experience: Optional[int] = None\n\njob = client.messages.create(\n    model='claude-sonnet-4-20250514', max_tokens=1024,\n    response_model=JobPosting,\n    messages=[{'role':'user','content':f'Extract: {raw_text}'}]\n)",challenge:"Add a second-pass validator: run each extraction twice, flag disagreements for human review."},
+{id:"llm3",title:"LLM Evaluation Framework",difficulty:"medium",time:"4–5 hrs",skills:["LLM Evaluation","LLM-as-Judge","Benchmarking"],tools:["Python","Anthropic API","pandas","plotly"],desc:"Build your own LLM evaluation harness — the skill that separates engineers who ship reliable AI from those who don't. Implement LLM-as-judge, pairwise comparison, and factual consistency checks. Benchmark two models head-to-head on your own test set.",steps:["Create a 50–100 row test set of prompt/expected-answer pairs","Implement ROUGE and exact-match evaluators as baselines","Build an LLM-as-judge evaluator using a rubric-based scoring prompt","Implement pairwise comparison: given response A and B, which is better?","Add a factual consistency checker: does the response agree with a reference?","Run Claude Sonnet and GPT-4o against your test set","Aggregate scores into a leaderboard with confidence intervals","Visualise per-category performance with plotly bar charts","Identify failure modes and write a findings summary"],concepts:["Evaluation metrics","Judge bias","Position bias in pairwise eval","Inter-rater agreement","Benchmark leakage","Calibration"],outcomes:["Build reliable AI product evaluation pipelines","Catch regressions before users do","Deep understanding of LLM benchmark design"],starter:"import anthropic\nfrom dataclasses import dataclass\n\nclient = anthropic.Anthropic()\n\n@dataclass\nclass EvalResult:\n    prompt: str\n    response: str\n    score: float  # 0–1\n    reasoning: str\n\ndef llm_judge(prompt: str, response: str, rubric: str) -> EvalResult:\n    judge_prompt = f\"\"\"\nYou are an expert evaluator. Score the response 0-10.\nRubric: {rubric}\nQuestion: {prompt}\nResponse: {response}\nReturn JSON: {{\"score\": int, \"reasoning\": str}}\"\"\"\n    # TODO: call LLM, parse JSON, return EvalResult\n    pass",challenge:"Add judge calibration: create 10 golden examples with human scores and measure your judge's Spearman correlation."}
+]},
+{id:"cat-rag",label:"RAG & Vector Search",color:"#fb7185",projects:[
+{id:"rag1",title:"Advanced RAG Pipeline from Scratch",difficulty:"medium",time:"6–8 hrs",skills:["RAG","Vector DBs","Embeddings","Retrieval"],tools:["LangChain","ChromaDB","Anthropic API","FastAPI","RAGAS"],desc:"Build a production RAG system beyond naive chunk-and-retrieve. Implement hybrid search, HyDE query expansion, cross-encoder re-ranking, and citation generation — the techniques used in real enterprise RAG deployments. Evaluate with RAGAS.",steps:["Ingest a 100+ page PDF: parse, clean, split into semantic chunks","Embed chunks with BGE-M3 or text-embedding-3-large","Store in ChromaDB with rich metadata (page, section, doc_id)","Implement naive RAG as baseline, measure retrieval accuracy","Add BM25 sparse retrieval and hybrid fusion with RRF algorithm","Implement HyDE: generate a hypothetical answer, embed it, retrieve with that vector","Add a cross-encoder re-ranker (BGE-reranker) on top-20 candidates","Build a citation generator: ground each sentence in the answer to a source chunk","Evaluate with RAGAS: faithfulness, answer relevancy, context precision","Wrap as a FastAPI endpoint with a minimal chat UI"],concepts:["Semantic chunking","Hybrid search","RRF fusion","HyDE","Cross-encoder re-ranking","RAGAS metrics","Faithfulness vs relevancy"],outcomes:["Build any enterprise RAG system","Deep knowledge of retrieval quality levers","Full-stack RAG deployment experience"],starter:"from langchain.text_splitter import RecursiveCharacterTextSplitter\nfrom langchain_community.vectorstores import Chroma\nfrom rank_bm25 import BM25Okapi\n\nclass HybridRAG:\n    def __init__(self, docs):\n        self.splitter = RecursiveCharacterTextSplitter(\n            chunk_size=512, chunk_overlap=64)\n        self.chunks = self.splitter.split_documents(docs)\n        # TODO: set up Chroma (dense) + BM25 (sparse) in parallel\n\n    def retrieve(self, query: str, k=5):\n        dense  = self.vectorstore.similarity_search(query, k=20)\n        sparse = self.bm25_search(query, k=20)\n        # TODO: fuse with RRF, re-rank with cross-encoder, return top-k\n        pass",challenge:"Add a self-RAG layer: after generating the answer, verify each claim is supported by retrieved context."},
+{id:"rag2",title:"GraphRAG: Knowledge Graph + Vector Hybrid",difficulty:"hard",time:"1 day",skills:["GraphRAG","Knowledge Graphs","Neo4j","Embeddings"],tools:["Neo4j","LangChain","Anthropic API","spaCy"],desc:"Implement GraphRAG — combining knowledge graph traversal with vector retrieval. Extract entities and relationships from documents, store them in Neo4j, and answer multi-hop questions by combining graph paths with chunk retrieval.",steps:["Use spaCy + LLM to extract (subject, relation, object) triplets from 50 documents","Store entity nodes and relationship edges in Neo4j","Link document chunks in a vector store to entity nodes in the graph","For a query: extract entities, traverse the KG for related concepts","Combine graph-retrieved context with vector-retrieved chunks","Answer multi-hop questions that require connecting 2–3 entities","Compare GraphRAG vs naive RAG on 20 multi-hop questions","Visualise the knowledge graph with pyvis"],concepts:["Knowledge graphs","Entity extraction","Graph traversal","Multi-hop reasoning","Entity disambiguation","Hybrid retrieval"],outcomes:["Build RAG for complex multi-document reasoning","Neo4j & graph DB skills","Understand when GraphRAG beats naive RAG"],starter:"from neo4j import GraphDatabase\nimport anthropic\n\nclass KGBuilder:\n    def __init__(self, uri, auth):\n        self.driver = GraphDatabase.driver(uri, auth=auth)\n        self.llm = anthropic.Anthropic()\n\n    def extract_triplets(self, text: str) -> list[dict]:\n        prompt = f'Extract (s,r,o) triplets from:\\n{text}\\nReturn JSON list: [{{\"s\":...,\"r\":...,\"o\":...}}]'\n        # TODO: call LLM, parse JSON\n        pass\n\n    def insert(self, triplets):\n        with self.driver.session() as s:\n            for t in triplets:\n                s.run('MERGE (a:Entity {name:$s}) MERGE (b:Entity {name:$o}) '\n                      'MERGE (a)-[r:REL {type:$r}]->(b)',**t)",challenge:"Add temporal reasoning: tag relationships with time periods and answer 'Who led X before Y?'"}
+]},
+{id:"cat-agents",label:"AI Agents & Agentic Systems",color:"#a3e635",projects:[
+{id:"ag1",title:"ReAct Agent with Custom Tools from Scratch",difficulty:"medium",time:"5–6 hrs",skills:["ReAct","Tool Use","Agents","LLM APIs"],tools:["Anthropic API","Python","various APIs"],desc:"Build a ReAct agent from scratch — no LangChain, no framework. Implement the think→tool-call→observe→think loop yourself using the Anthropic tool-use API. Give it 5 real tools and let it solve multi-step research tasks.",steps:["Define 5 tools as Pydantic models: web_search, calculator, code_executor, file_read, wikipedia","Implement tool execution: real Python functions for each tool","Write the agent loop: call LLM → parse tool_use block → execute → feed result back","Handle multi-turn: accumulate messages array with tool_result blocks correctly","Add a max_steps limit and graceful stopping condition","Implement a chain-of-thought scratchpad the agent uses before each action","Test on 10 multi-step tasks: 'Research X, summarise, save to file'","Add streaming so you can watch the agent think in real time","Log all tool calls and build a success rate report"],concepts:["Tool use / function calling","ReAct loop","Message accumulation","Tool result formatting","Agent stopping criteria","Grounding"],outcomes:["Build any custom agent without a framework","Deep understanding of how LangChain agents work internally","Tool design expertise"],starter:"import anthropic\nclient = anthropic.Anthropic()\n\nTOOLS = [\n    {'name':'web_search','description':'Search the web',\n     'input_schema':{'type':'object','properties':{\n         'query':{'type':'string'}},\n     'required':['query']}}\n    # TODO: add calculator, code_executor, wikipedia, file_write\n]\n\ndef run_tool(name: str, inputs: dict) -> str:\n    # TODO: dispatch to real implementations\n    pass\n\ndef agent_loop(task: str, max_steps=10) -> str:\n    messages = [{'role':'user','content':task}]\n    for _ in range(max_steps):\n        resp = client.messages.create(\n            model='claude-sonnet-4-20250514',\n            max_tokens=4096, tools=TOOLS, messages=messages\n        )\n        if resp.stop_reason == 'end_turn': break\n        # TODO: handle tool_use blocks, append results\n    return messages[-1]['content']",challenge:"Add memory: persist the agent's observations to a vector store so it recalls past research sessions."},
+{id:"ag2",title:"Multi-Agent Research System with LangGraph",difficulty:"hard",time:"1 day",skills:["LangGraph","Multi-agent","Orchestration","State Machines"],tools:["LangGraph","LangChain","Anthropic API","Tavily"],desc:"Build a multi-agent research pipeline with LangGraph: a Planner decomposes tasks, Researcher agents gather information in parallel, a Critic evaluates quality, and a Writer synthesises a final report. Includes human-in-the-loop approval.",steps:["Design the graph: Planner, Researcher×3 (parallel), Critic, Writer nodes","Define the shared state schema with TypedDict","Implement Planner: takes a question, outputs a list of sub-queries","Implement Researcher: uses web search + RAG to gather facts for one sub-query","Fan out Researchers in parallel using LangGraph's Send() API","Implement Critic: reviews gathered facts for gaps and contradictions","Add a conditional edge: if Critic is unsatisfied, loop back to Research","Implement Writer: synthesises facts into a structured report with citations","Add human-in-the-loop: pause graph before final write for user approval","Stream graph execution with live status updates"],concepts:["Graph state","Conditional edges","Fan-out / fan-in","Human-in-the-loop","Checkpointing","Agent specialisation"],outcomes:["Build production-grade multi-agent pipelines","LangGraph expert-level skill","Understanding of when multi-agent beats single-agent"],starter:"from langgraph.graph import StateGraph, END\nfrom typing import TypedDict, Annotated\nimport operator\n\nclass ResearchState(TypedDict):\n    question: str\n    sub_queries: list[str]\n    research_results: Annotated[list[str], operator.add]  # parallel append\n    critique: str\n    final_report: str\n    iteration: int\n\ndef planner(state: ResearchState):\n    # TODO: call LLM to decompose question into sub-queries\n    return {'sub_queries': [...]}\n\ndef researcher(state: ResearchState):\n    # TODO: web search + summarise for one sub-query\n    return {'research_results': [result]}\n\nbuilder = StateGraph(ResearchState)\nbuilder.add_node('planner', planner)\n# TODO: add researcher, critic, writer, edges, conditionals",challenge:"Add a memory node that checks whether this question was researched before and reuses cached results."},
+{id:"ag3",title:"Self-Debugging Coding Agent",difficulty:"hard",time:"1 day",skills:["Code Generation","Tool Use","Self-debugging","Agents"],tools:["Anthropic API","Python","subprocess","pytest","Docker"],desc:"Build an agent that writes, runs, tests, and self-debugs Python code — the core of GitHub Copilot Workspace and Devin-style systems. The agent gets a task, writes code, executes it in a sandbox, reads errors, fixes them, and iterates until tests pass.",steps:["Set up a Docker sandbox for safe code execution (never run LLM code unsandboxed)","Implement a code_exec tool: runs Python in sandbox, returns stdout/stderr","Implement write_file, read_file, and run_tests tools","Build the agent loop: write → test → read errors → debug → repeat","Give the agent 10 LeetCode-style coding challenges","Measure: how often does it solve each problem within 5 iterations?","Add a code review step: after a passing solution, ask a second LLM call to suggest improvements","Log all iterations and compute pass@k metric for k=1,3,5"],concepts:["Sandboxed execution","Self-debugging loops","Pass@k metric","Code synthesis","Test-driven generation","Error interpretation"],outcomes:["Build a Devin-style coding assistant","Deep understanding of code agent design","Docker sandboxing skills"],starter:"import subprocess, tempfile, os\n\ndef execute_python(code: str, timeout=30) -> dict:\n    with tempfile.NamedTemporaryFile(suffix='.py',mode='w',delete=False) as f:\n        f.write(code); fname = f.name\n    try:\n        r = subprocess.run(['python', fname],\n            capture_output=True, text=True, timeout=timeout)\n        return {'stdout':r.stdout,'stderr':r.stderr,'rc':r.returncode}\n    except subprocess.TimeoutExpired:\n        return {'stdout':'','stderr':'TIMEOUT','rc':-1}\n    finally:\n        os.unlink(fname)\n\n# TODO: build agent loop that iterates with this tool",challenge:"Make it a TDD agent: write the test suite FIRST, then generate implementation to pass the tests."},
+{id:"ag4",title:"Voice AI Assistant — End to End",difficulty:"hard",time:"1 day",skills:["STT","TTS","LLM","Real-time Audio","Agentic"],tools:["Whisper","ElevenLabs","Anthropic API","FastAPI","WebSocket"],desc:"Build a complete voice AI assistant: mic → Whisper transcription → Claude with tools → ElevenLabs TTS → speaker. Full duplex with real-time streaming audio, function calling, and a web UI showing the live transcript.",steps:["Record audio from microphone using PyAudio with VAD (voice activity detection)","Transcribe with OpenAI Whisper (local or API)","Send transcript to Claude with a set of tools (calendar, weather, search)","Stream the text response, piping each sentence to TTS as it arrives","Play TTS audio output in real time with PyAudio","Build a WebSocket server in FastAPI connecting browser mic to backend","Build a React/HTML frontend: audio level viz, transcript, tool call log","Add wake-word detection: only activate on 'Hey Claude'","Measure end-to-end latency from speech end to first audio byte"],concepts:["VAD","Streaming TTS","WebSocket full-duplex","Latency optimization","Audio chunking","Wake-word detection"],outcomes:["Build any voice AI product","Real-time audio pipeline mastery","End-to-end full-stack AI experience"],starter:"import pyaudio, numpy as np, whisper, anthropic\n\ndef is_speech(chunk: np.ndarray, threshold=0.02) -> bool:\n    return np.abs(chunk).mean() > threshold\n\ndef record_until_silence(stream, chunk=1024, silence_limit=30):\n    frames, silent = [], 0\n    while True:\n        data = stream.read(chunk)\n        audio = np.frombuffer(data, np.int16).astype(np.float32)/32768\n        frames.append(data)\n        silent = silent+1 if not is_speech(audio) else 0\n        if silent > silence_limit and len(frames) > 20: break\n    return b''.join(frames)\n\n# TODO: build full pipeline: record → transcribe → LLM → TTS → play",challenge:"Add emotion detection from voice tone and adjust Claude's response style accordingly."}
+]},
+{id:"cat-mlops",label:"MLOps & Deployment",color:"#94a3b8",projects:[
+{id:"ops1",title:"Deploy Open-Source LLM with vLLM + Docker",difficulty:"medium",time:"5–6 hrs",skills:["vLLM","Docker","FastAPI","LLM Serving"],tools:["vLLM","Docker","FastAPI","Nginx","Prometheus"],desc:"Deploy Mistral 7B or Llama 3 8B as a production-grade OpenAI-compatible API using vLLM. Add authentication, rate limiting, Prometheus monitoring, Grafana dashboards, and Nginx load balancing. This is the core MLOps skill every AI engineer needs.",steps:["Set up vLLM with a 7B model, test with OpenAI Python SDK at localhost","Build FastAPI wrapper: API key auth + per-user rate limiting","Write Dockerfile and docker-compose.yml with CUDA GPU passthrough","Add Prometheus metrics: requests, latency p50/p95/p99, tokens/sec","Set up Grafana dashboard with LLM-specific panels","Configure Nginx for load balancing across 2 vLLM instances","Load test with locust: measure throughput vs batch size","Add request/response logging to PostgreSQL for audit trail","Deploy to RunPod or Lambda Labs GPU instance"],concepts:["Continuous batching","PagedAttention","GPU memory management","OpenAI API compatibility","Horizontal scaling","Prometheus / Grafana"],outcomes:["Ship production LLM APIs","Infrastructure skills for ML engineering","Deep vLLM internals knowledge"],starter:"# docker-compose.yml sketch:\n# vllm:\n#   image: vllm/vllm-openai:latest\n#   runtime: nvidia\n#   command: python -m vllm.entrypoints.openai.api_server\n#            --model mistralai/Mistral-7B-Instruct-v0.2\n#            --max-model-len 8192\n#   ports: ['8000:8000']\n\nfrom fastapi import FastAPI, Depends, HTTPException\nfrom fastapi.security import HTTPBearer\nimport httpx\n\napp = FastAPI()\nsecurity = HTTPBearer()\nVLLM = 'http://vllm:8000'\n\n@app.post('/v1/chat/completions')\nasync def proxy_chat(body: dict, token=Depends(security)):\n    # TODO: validate key, rate limit, proxy to vLLM, log metrics\n    pass",challenge:"Implement speculative decoding with TinyLlama as draft model and measure the speedup."},
+{id:"ops2",title:"LLM Observability & Tracing System",difficulty:"medium",time:"4–5 hrs",skills:["LLM Observability","Tracing","Logging","Analytics"],tools:["Langfuse","OpenTelemetry","Python","PostgreSQL","Grafana"],desc:"Build a full observability stack for your LLM app: trace every call, measure latency at each pipeline step, track costs per user, detect quality regressions automatically, and build a dashboard that catches problems before users report them.",steps:["Instrument your LLM app with OpenTelemetry spans at each step","Store traces in PostgreSQL: prompt, response, latency, tokens, cost","Build a cost calculator: tokens × model pricing → cost per request","Add Langfuse for LLM-specific tracing with session grouping","Implement anomaly detection: flag responses where LLM changes topic","Build daily summary reports: avg latency, cost, error rate, top queries","Create a Grafana dashboard with p99 latency alerts","Add A/B testing: send 10% of traffic to a new model/prompt","Build a user feedback loop: thumbs up/down updates a labelled dataset"],concepts:["Distributed tracing","Span / trace","LLM cost accounting","Semantic drift detection","A/B testing","Feedback loops"],outcomes:["Production LLM monitoring expertise","Cost control for AI products","Data-driven prompt iteration skill"],starter:"from opentelemetry import trace\nfrom opentelemetry.sdk.trace import TracerProvider\nimport time, anthropic\n\ntrace.set_tracer_provider(TracerProvider())\ntracer = trace.get_tracer(__name__)\nclient = anthropic.Anthropic()\n\ndef traced_call(prompt: str):\n    with tracer.start_as_current_span('llm_call') as span:\n        span.set_attribute('prompt.length', len(prompt))\n        t0 = time.time()\n        resp = client.messages.create(\n            model='claude-sonnet-4-20250514', max_tokens=1024,\n            messages=[{'role':'user','content':prompt}]\n        )\n        span.set_attribute('latency_ms', (time.time()-t0)*1000)\n        span.set_attribute('output_tokens', resp.usage.output_tokens)\n        # TODO: calculate cost, store to DB\n        return resp",challenge:"Build an automatic regression detector: compare this week's avg quality score to last week's using LLM-as-judge."}
+]},
+{id:"cat-capstone",label:"Capstone Projects",color:"#e879f9",projects:[
+{id:"cap1",title:"Personal AI Research Assistant — Full Stack",difficulty:"hard",time:"1–2 weeks",skills:["Full Stack","RAG","Agents","Fine-tuning","Deployment"],tools:["Next.js","FastAPI","PostgreSQL","Redis","ChromaDB","Anthropic","Vercel/Railway"],desc:"Build and ship a complete AI research assistant: ingest papers, docs, and web pages; ask questions with advanced RAG; save insights; generate literature review drafts. Deploy it publicly. This is your portfolio centrepiece.",steps:["Backend: FastAPI + PostgreSQL + Redis + ChromaDB","Ingest: URL scraper, PDF parser, arXiv API connector","RAG: semantic chunking, hybrid search, re-ranking, citations","Agent: ResearchAgent that autonomously searches arXiv and summarises","Frontend: Next.js with streaming chat UI, document viewer, insight board","Auth: user accounts with JWT, per-user document collections","Deploy: Docker on Railway/Render, Vercel for frontend","Fine-tune a small model on your own interaction data","Eval: measure RAG quality with RAGAS, track usage with Langfuse","Polish: landing page, README, demo video"],concepts:["Full-stack architecture","Multi-tenant design","Vector DB at scale","Streaming UX","Production deployment","User feedback loops"],outcomes:["A shipped, real product to show employers","Full-stack AI engineering portfolio piece","End-to-end system design experience"],starter:"# Recommended file structure:\n# backend/app/api/       - FastAPI routes\n# backend/app/core/      - RAG pipeline, agent logic\n# backend/app/models/    - SQLAlchemy ORM\n# backend/app/services/  - LLM, embedding, vector DB clients\n# frontend/app/          - Next.js app router\n# frontend/components/   - Chat, DocViewer, InsightBoard\n# docker-compose.yml\n\n# Strategy: ship RAG core in week 1, polish + auth in week 2.",challenge:"Add a weekly digest: every Sunday the agent searches for new papers on your tracked topics and emails you a summary."},
+{id:"cap2",title:"Contribute to an Open-Source LLM Project",difficulty:"hard",time:"Ongoing",skills:["Open Source","PyTorch","LLM internals","Research Engineering"],tools:["GitHub","PyTorch","transformers","vLLM or llama.cpp"],desc:"The fastest path from practitioner to expert: contribute to vLLM, HuggingFace transformers, llama.cpp, or LangGraph. Study the codebase, find a good first issue related to something you've studied, and ship a real PR that gets merged.",steps:["Pick a repo: vLLM, HuggingFace transformers, llama.cpp, LangGraph, or LlamaIndex","Read the architecture docs and explore the codebase for a week","Run all tests locally and make a trivial change to verify your setup","Find 'good first issue' or 'help wanted' labels on GitHub","Pick an issue related to something you've studied (e.g. a new attention variant)","Read relevant papers and existing implementations before writing code","Write the implementation with tests following the project's style guide","Open a draft PR early — get feedback from maintainers","Iterate until it gets merged","Write a blog post explaining what you built and what you learned"],concepts:["Codebase navigation","Test-driven development","Git workflow","Code review","Technical writing","Open source etiquette"],outcomes:["Real proof of expert-level skill","Maintainer network in the AI field","Deep codebase understanding no course gives you"],starter:"# Good starter issues by repo:\n#\n# vLLM\n#   - Add support for a new quantization format\n#   - Improve docs for a serving feature\n#   - Fix a bug in the PagedAttention allocator\n#\n# transformers\n#   - Add a new model architecture\n#   - Improve generation utils\n#   - Add tests for an undertested feature\n#\n# LangGraph\n#   - Add a new built-in agent pattern\n#   - Improve streaming support\n#\n# llama.cpp\n#   - Port a new model architecture\n#   - Add a new GGUF quantization type\n#\n# Start by reading CONTRIBUTING.md in the chosen repo.",challenge:"After your first merged PR, write a thread on LinkedIn explaining the change. Build your public AI profile in parallel with your skills."}
+]}
+];
+
+// ─── STATE ────────────────────────────────────────────────────────────────────
+let notes={}, donePractice={}, ghSha=null, currentKey=null, currentPhase=null, currentTab='notes', currentPid=null;
+
+// ─── BOOT ─────────────────────────────────────────────────────────────────────
+window.addEventListener('DOMContentLoaded', async () => {
+  renderSidebar(); updateStats(); await loadFromGithub();
+});
+
+// ─── TAB SWITCHING ────────────────────────────────────────────────────────────
+function switchTab(tab) {
+  currentTab = tab;
+  document.getElementById('tab-notes').classList.toggle('active', tab==='notes');
+  document.getElementById('tab-practice').classList.toggle('active', tab==='practice');
+  document.getElementById('welcome').style.display='flex';
+  document.getElementById('content').style.display='none';
+  document.getElementById('header').style.display='none';
+  currentKey=null; currentPid=null;
+  renderSidebar(document.getElementById('search').value);
+}
+
+// ─── SIDEBAR ──────────────────────────────────────────────────────────────────
+function renderSidebar(filter='') {
+  const c=document.getElementById('sidebar-scroll'), fl=filter.toLowerCase();
+  c.innerHTML='';
+  if (currentTab==='notes') {
+    PHASES.forEach(phase => {
+      const all=phase.sections.flatMap(s=>s.topics);
+      const vis=fl ? all.filter(t=>t.toLowerCase().includes(fl)) : all;
+      if (!vis.length) return;
+      const noted=all.filter(t=>notes[phase.id+'::'+t]?.trim()).length;
+      const pct=Math.round(noted/all.length*100);
+      const open=fl||currentPhase===phase.id;
+      const d=document.createElement('div'); d.className='phase-item';
+      d.innerHTML=`<button class="phase-btn ${open?'open':''}" onclick="togglePhase(this,'${phase.id}')">
+        <span class="phase-dot" style="background:${phase.color}"></span>
+        <span style="flex:1;font-size:11px">${phase.label}: ${phase.title}</span>
+        <span style="font-size:10px;color:var(--text3);font-family:var(--font-mono)">${noted}/${all.length}</span>
+        <span class="phase-chevron">▶</span></button>
+      <div class="phase-progress"><div class="p-track"><div class="p-fill" style="width:${pct}%;background:${phase.color}"></div></div></div>
+      <div class="phase-topics">${phase.sections.map(s=>{
+        const st=fl?s.topics.filter(t=>t.toLowerCase().includes(fl)):s.topics;
+        if(!st.length) return '';
+        return `<div class="sec-label">${s.title}</div>`+st.map(t=>{
+          const k=phase.id+'::'+t;
+          return `<button class="topic-btn ${notes[k]?.trim()?'has-note':''} ${currentKey===k?'active':''}"
+            onclick="selectTopic('${phase.id}','${esc(t)}','${esc(k)}','${phase.color}','${esc(phase.label+': '+phase.title)}')">${t}</button>`;
+        }).join('');
+      }).join('')}</div>`;
+      c.appendChild(d);
+    });
+  } else {
+    PRACTICE_CATS.forEach(cat => {
+      const vis=fl ? cat.projects.filter(p=>p.title.toLowerCase().includes(fl)||p.skills.some(s=>s.toLowerCase().includes(fl))) : cat.projects;
+      if (!vis.length) return;
+      const dc=cat.projects.filter(p=>donePractice[p.id]).length;
+      const open=fl||vis.some(p=>p.id===currentPid);
+      const d=document.createElement('div'); d.className='phase-item';
+      d.innerHTML=`<button class="phase-btn ${open?'open':''}" onclick="togglePhaseBtn(this)">
+        <span class="phase-dot" style="background:${cat.color}"></span>
+        <span style="flex:1;font-size:11px">${cat.label}</span>
+        <span style="font-size:10px;color:var(--text3);font-family:var(--font-mono)">${dc}/${cat.projects.length}</span>
+        <span class="phase-chevron">▶</span></button>
+      <div class="phase-topics">${vis.map(p=>{
+        const dc2={easy:'var(--green)',medium:'var(--amber)',hard:'var(--red)'}[p.difficulty];
+        return `<button class="topic-btn ${donePractice[p.id]?'done-practice':''} ${currentPid===p.id?'active':''}"
+          onclick="selectPractice('${p.id}','${cat.color}','${esc(cat.label)}')">
+          <span style="width:5px;height:5px;border-radius:50%;background:${dc2};flex-shrink:0;display:inline-block"></span>
+          ${p.title}</button>`;
+      }).join('')}</div>`;
+      c.appendChild(d);
+    });
+  }
+}
+function esc(s){return s.replace(/'/g,"\\'")}
+function togglePhase(btn,id){const was=btn.classList.contains('open');document.querySelectorAll('.phase-btn').forEach(b=>b.classList.remove('open'));if(!was){btn.classList.add('open');currentPhase=id;}else currentPhase=null;}
+function togglePhaseBtn(btn){const was=btn.classList.contains('open');document.querySelectorAll('.phase-btn').forEach(b=>b.classList.remove('open'));if(!was)btn.classList.add('open');}
+function handleSearch(v){renderSidebar(v);}
+
+// ─── SELECT TOPIC (NOTES) ─────────────────────────────────────────────────────
+function selectTopic(phaseId,topic,key,color,phaseLabel){
+  if(currentKey) saveCurrentNote();
+  currentKey=key; currentPhase=phaseId; currentPid=null;
+  show('notes');
+  document.getElementById('topic-title').textContent=topic;
+  setTag(phaseLabel,color);
+  document.getElementById('header-btns').innerHTML=`
+    <button class="btn btn-revise" onclick="reviseWithAI()">✦ AI Revise</button>
+    <button class="btn btn-save" onclick="saveNote()">💾 Save</button>
+    <button class="btn btn-clear" onclick="clearNote()">✕</button>`;
+  document.getElementById('note-editor').value=notes[key]||'';
+  document.getElementById('revision-body').innerHTML='<div class="revision-placeholder">Click <strong>✦ AI Revise</strong> to generate a revision summary.</div>';
+  document.getElementById('rev-pane-label').textContent='✦ ai revision summary';
+  renderSidebar(document.getElementById('search').value);
+  document.getElementById('note-editor').focus();
+}
+
+// ─── SELECT PRACTICE ──────────────────────────────────────────────────────────
+function selectPractice(pid,color,catLabel){
+  if(currentKey) saveCurrentNote();
+  const p=PRACTICE_CATS.flatMap(c=>c.projects).find(x=>x.id===pid);
+  if(!p) return;
+  currentPid=pid; currentKey=null;
+  show('practice');
+  document.getElementById('topic-title').textContent=p.title;
+  setTag(catLabel,color);
+  const diffC={easy:'var(--green)',medium:'var(--amber)',hard:'var(--red)'}[p.difficulty];
+  document.getElementById('practice-pane-label').textContent=`⚡ ${p.difficulty.toUpperCase()} · ${p.time}`;
+  const isDone=!!donePractice[pid];
+  document.getElementById('header-btns').innerHTML=`
+    <button class="btn ${isDone?'btn-clear':'btn-done'}" onclick="toggleDone('${pid}')">${isDone?'↩ Undo':'✓ Done'}</button>`;
+  renderPractice(p,color,diffC);
+  document.getElementById('rev-pane-label').textContent='✦ ai project help';
+  document.getElementById('revision-body').innerHTML=`
+    <div class="revision-placeholder" style="padding-top:16px">Get AI help for this project:</div>
+    <div style="padding:10px;display:flex;flex-direction:column;gap:6px">
+      <button class="btn btn-revise" style="width:100%;justify-content:center;font-size:11px" onclick="practiceAI('explain','${pid}')">✦ Explain the concepts</button>
+      <button class="btn btn-revise" style="width:100%;justify-content:center;font-size:11px" onclick="practiceAI('hint','${pid}')">💡 Give me a hint</button>
+      <button class="btn btn-revise" style="width:100%;justify-content:center;font-size:11px" onclick="practiceAI('pitfalls','${pid}')">⚠ Pitfalls to avoid</button>
+    </div>`;
+  renderSidebar(document.getElementById('search').value);
+}
+
+function show(mode){
+  document.getElementById('welcome').style.display='none';
+  document.getElementById('content').style.display='flex';
+  document.getElementById('header').style.display='flex';
+  document.getElementById('editor-pane').style.display=mode==='notes'?'flex':'none';
+  document.getElementById('practice-pane').style.display=mode==='practice'?'flex':'none';
+  document.getElementById('revision-pane').style.display='flex';
+}
+function setTag(label,color){
+  const t=document.getElementById('topic-phase-tag');
+  t.textContent=label;
+  t.style.cssText=`background:${color}20;color:${color};border:1px solid ${color}40;font-size:10px;padding:3px 9px;border-radius:20px;font-family:var(--font-mono);flex-shrink:0;white-space:nowrap`;
+}
+
+function renderPractice(p,color,diffC){
+  const diffLabel={easy:'Easy',medium:'Medium',hard:'Hard'}[p.difficulty];
+  document.getElementById('practice-body').innerHTML=`
+    <div style="margin-bottom:14px">
+      <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:9px">
+        <span class="pc-tag diff-${p.difficulty}">${diffLabel}</span>
+        <span class="pc-tag time">⏱ ${p.time}</span>
+        ${p.skills.map(s=>`<span class="pc-tag skill">${s}</span>`).join('')}
+        ${p.tools.map(t=>`<span class="pc-tag tool">${t}</span>`).join('')}
+      </div>
+      <p class="pc-desc">${p.desc}</p>
+    </div>
+    <div class="pc-section">
+      <div class="pc-section-title">🎯 What you'll gain</div>
+      ${p.outcomes.map(o=>`<div class="outcome-item">${o}</div>`).join('')}
+    </div>
+    <div class="pc-section">
+      <div class="pc-section-title">📋 Step-by-step guide</div>
+      <ol class="step-list">${p.steps.map(s=>`<li>${s}</li>`).join('')}</ol>
+    </div>
+    <div class="pc-section">
+      <div class="pc-section-title">🧠 Concepts you'll master</div>
+      <div style="display:flex;flex-wrap:wrap;gap:3px">${p.concepts.map(c=>`<span class="concept-chip">${c}</span>`).join('')}</div>
+    </div>
+    <div class="pc-section">
+      <div class="pc-section-title">💻 Starter code</div>
+      <div class="code-block">${p.starter.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>
+    </div>
+    <div class="pc-section">
+      <div class="pc-section-title">🔥 Stretch challenge</div>
+      <div class="challenge-box"><strong>Challenge:</strong> ${p.challenge}</div>
+    </div>`;
+}
+
+function toggleDone(pid){
+  donePractice[pid]=!donePractice[pid];
+  const d=donePractice[pid];
+  document.getElementById('header-btns').innerHTML=`
+    <button class="btn ${d?'btn-clear':'btn-done'}" onclick="toggleDone('${pid}')">${d?'↩ Undo':'✓ Done'}</button>`;
+  updateStats(); renderSidebar(document.getElementById('search').value);
+  showToast(d?'Marked done! ✓':'Marked in-progress',d?'ok':'');
+}
+
+// ─── NOTE OPS ─────────────────────────────────────────────────────────────────
+function saveCurrentNote(){if(!currentKey)return;const v=document.getElementById('note-editor').value;if(v.trim())notes[currentKey]=v;else delete notes[currentKey];}
+function saveNote(){saveCurrentNote();updateStats();renderSidebar(document.getElementById('search').value);showToast('Note saved ✓','ok');}
+function clearNote(){if(!confirm('Clear this note?'))return;document.getElementById('note-editor').value='';delete notes[currentKey];updateStats();renderSidebar(document.getElementById('search').value);showToast('Cleared','ok');}
+document.getElementById('note-editor').addEventListener('input',()=>{if(currentKey)notes[currentKey]=document.getElementById('note-editor').value;});
+
+// ─── STATS ────────────────────────────────────────────────────────────────────
+function updateStats(){
+  const tot=PHASES.flatMap(p=>p.sections.flatMap(s=>s.topics)).length;
+  const noted=Object.keys(notes).filter(k=>notes[k]?.trim()).length;
+  const allP=PRACTICE_CATS.flatMap(c=>c.projects);
+  const done=allP.filter(p=>donePractice[p.id]).length;
+  document.getElementById('stat-total').textContent=tot;
+  document.getElementById('stat-noted').textContent=noted;
+  document.getElementById('stat-projects').textContent=allP.length;
+  document.getElementById('stat-done').textContent=done;
+}
+
+// ─── GITHUB SYNC ──────────────────────────────────────────────────────────────
+async function loadFromGithub(){
+  const cfg=window.APP_CONFIG||{};
+  if(!cfg.ghConfigured){document.getElementById('sync-status').textContent='⚠ GitHub not configured';return;}
+  document.getElementById('sync-status').textContent='Loading from GitHub…';
+  try{
+    const r=await fetch(`${cfg.streamlitBase}?action=load`);
+    const d=await r.json();
+    if(d?.notes){notes=d.notes;ghSha=d.sha||null;}
+    if(d?.notes?.__donePractice__)donePractice=d.notes.__donePractice__;
+    document.getElementById('sync-status').textContent='✓ Loaded from GitHub';
+    updateStats();renderSidebar();
+  }catch(e){document.getElementById('sync-status').textContent='Load failed';}
+}
+async function syncToGithub(){
+  saveCurrentNote();
+  const cfg=window.APP_CONFIG||{};
+  if(!cfg.ghConfigured){showToast('Configure GitHub secrets first','err');return;}
+  const btn=document.getElementById('sync-btn');
+  btn.disabled=true;btn.innerHTML='<span class="spinner"></span> Saving…';
+  document.getElementById('sync-status').textContent='Saving to GitHub…';
+  try{
+    const payload={notes:{...notes,__donePractice__:donePractice},sha:ghSha};
+    const r=await fetch(`${cfg.streamlitBase}?action=save`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    const d=await r.json();
+    if(d.ok){showToast(d.msg||'Saved ✓','ok');document.getElementById('sync-status').textContent='✓ Synced to GitHub';}
+    else{showToast(d.msg||'Save failed','err');document.getElementById('sync-status').textContent='Save failed';}
+  }catch(e){showToast('Network error','err');document.getElementById('sync-status').textContent='Network error';}
+  btn.disabled=false;btn.innerHTML='<span>⟳</span> Save to GitHub';
+}
+
+// ─── AI REVISION ──────────────────────────────────────────────────────────────
+async function reviseWithAI(){
+  const cfg=window.APP_CONFIG||{};
+  if(!cfg.aiConfigured){showToast('Set ANTHROPIC_API_KEY in secrets','err');return;}
+  const topic=document.getElementById('topic-title').textContent;
+  const note=document.getElementById('note-editor').value;
+  const body=document.getElementById('revision-body');
+  body.innerHTML='<div style="color:var(--text3);padding:16px;text-align:center"><span class="spinner"></span><br/><br/>Generating…</div>';
+  try{
+    const r=await fetch(`${cfg.streamlitBase}?${new URLSearchParams({action:'revise',topic,note})}`);
+    const d=await r.json();
+    body.innerHTML=d.text?`<div class="revision-content">${marked.parse(d.text)}</div>`:'<div class="revision-placeholder">No response.</div>';
+  }catch(e){body.innerHTML='<div class="revision-placeholder">Error.</div>';}
+}
+
+// ─── AI PRACTICE HELP ─────────────────────────────────────────────────────────
+async function practiceAI(mode,pid){
+  const cfg=window.APP_CONFIG||{};
+  if(!cfg.aiConfigured){showToast('Set ANTHROPIC_API_KEY in secrets','err');return;}
+  const p=PRACTICE_CATS.flatMap(c=>c.projects).find(x=>x.id===pid);
+  const body=document.getElementById('revision-body');
+  body.innerHTML='<div style="color:var(--text3);padding:16px;text-align:center"><span class="spinner"></span><br/><br/>Generating…</div>';
+  const prompts={
+    explain:`You are a GenAI mentor. Explain the core concepts for this project in an intuitive way (200 words max):\n\nProject: ${p.title}\nConcepts: ${p.concepts.join(', ')}\n\nUse bullet points and focus on intuition, not math.`,
+    hint:`Give 3 specific implementation hints (not solutions) for this project:\n\nProject: ${p.title}\nTools: ${p.tools.join(', ')}\nSteps: ${p.steps.slice(0,4).join('; ')}\n\nBe specific to the actual code challenges. Nudge without spoiling.`,
+    pitfalls:`List the top 5 pitfalls and debugging tips for this project. Be specific:\n\nProject: ${p.title}\n\nFormat as a numbered list with brief explanations.`
+  };
+  try{
+    const r=await fetch(`${cfg.streamlitBase}?${new URLSearchParams({action:'revise',topic:p.title,note:prompts[mode]})}`);
+    const d=await r.json();
+    body.innerHTML=d.text?`<div class="revision-content">${marked.parse(d.text)}</div>
+      <div style="padding:8px;display:flex;flex-direction:column;gap:5px">
+        <button class="btn btn-revise" style="width:100%;justify-content:center;font-size:11px" onclick="practiceAI('explain','${pid}')">✦ Explain concepts</button>
+        <button class="btn btn-revise" style="width:100%;justify-content:center;font-size:11px" onclick="practiceAI('hint','${pid}')">💡 Hint</button>
+        <button class="btn btn-revise" style="width:100%;justify-content:center;font-size:11px" onclick="practiceAI('pitfalls','${pid}')">⚠ Pitfalls</button>
+      </div>`:'<div class="revision-placeholder">No response.</div>';
+  }catch(e){body.innerHTML='<div class="revision-placeholder">Error.</div>';}
+}
+
+// ─── TOAST ────────────────────────────────────────────────────────────────────
+function showToast(msg,type=''){
+  const t=document.getElementById('toast');
+  t.textContent=msg;t.className=`show ${type}`;
+  setTimeout(()=>{t.className='';},2800);
+}
+</script>
+</body>
+</html>
