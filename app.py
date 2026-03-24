@@ -7,7 +7,7 @@ GenAI Notes — Pure Streamlit App
 • NO iframes, NO GitHub token, NO CORS issues
 """
 import streamlit as st
-import json, os, base64, requests
+import json, os, base64, requests, urllib.parse
 from pathlib import Path
 
 BASE       = Path(__file__).parent
@@ -46,37 +46,44 @@ html,body,.stApp,[data-testid="stAppViewContainer"]{
 [data-testid="stSidebar"]>div:first-child{padding-top:0!important}
 
 /* sidebar buttons */
-[data-testid="stSidebar"] .stButton button{
-  width:100%!important; text-align:left!important;
-  justify-content:flex-start!important;
-  background:transparent!important; border:none!important;
-  border-left:3px solid transparent!important;
-  border-radius:0!important; color:#9298ab!important;
-  font-family:'DM Sans',sans-serif!important;
-  font-size:12px!important; font-weight:500!important;
-  padding:6px 14px 6px 28px!important;
-  box-shadow:none!important; transition:all .12s!important;
-}
-[data-testid="stSidebar"] .stButton button:hover{
-  background:#1a1d26!important; color:#e8eaf0!important;
-  transform:none!important; opacity:1!important;
-}
+/* sidebar — only the non-nav parts still use st.button (tab switcher + search) */
 
-/* active topic */
-.nav-active [data-testid="stSidebar"] .stButton button{
-  background:#7c6ef710!important; color:#7c6ef7!important;
+/* ── sidebar nav (pure HTML anchors) ── */
+.sb-nav a,.sb-topic{
+  display:block; width:100%; padding:5px 14px 5px 30px;
+  font-size:12px; color:#9298ab;
+  font-family:'DM Sans',sans-serif;
+  text-decoration:none !important; cursor:pointer;
+  border-left:3px solid transparent;
+  transition:background .1s,color .1s; white-space:nowrap;
+  overflow:hidden; text-overflow:ellipsis; box-sizing:border-box;
+}
+.sb-nav a:hover,.sb-topic:hover{background:#1a1d26!important;color:#e8eaf0!important}
+.sb-nav a.active,.sb-topic.active{
+  background:#7c6ef710!important;color:#7c6ef7!important;
   border-left-color:#7c6ef7!important;
 }
-
-/* phase headers in sidebar */
-.phase-header{
-  font-size:11px; font-weight:600; color:#5c6275;
-  text-transform:uppercase; letter-spacing:.08em;
-  padding:10px 14px 4px; font-family:'DM Mono',monospace;
+.sb-phase-hdr{
+  display:flex;align-items:center;gap:6px;
+  padding:9px 14px 3px;
+  font-size:10px;font-weight:700;color:#5c6275;
+  text-transform:uppercase;letter-spacing:.08em;
+  font-family:'DM Mono',monospace;
 }
-.phase-dot{
-  display:inline-block; width:7px; height:7px;
-  border-radius:50%; margin-right:6px; vertical-align:middle;
+.sb-pdot{width:7px;height:7px;border-radius:50%;display:inline-block;flex-shrink:0}
+.sb-pcnt{margin-left:auto;font-size:10px;color:#5c6275}
+.sb-prog{padding:0 14px 4px}
+.sb-prog-track{height:2px;background:#ffffff10;border-radius:1px;overflow:hidden}
+.sb-prog-fill{height:100%;border-radius:1px}
+.sb-sec-lbl{
+  padding:5px 14px 2px 28px;
+  font-size:9px;color:#5c6275;
+  font-family:'DM Mono',monospace;
+  text-transform:uppercase;letter-spacing:.06em;
+}
+.sb-noted-dot{
+  display:inline-block;width:5px;height:5px;border-radius:50%;
+  background:#3dd68c;margin-right:5px;vertical-align:middle;
 }
 
 /* main content area */
@@ -275,6 +282,36 @@ def persist():
     payload["__done_practice__"] = done_practice
     save_notes(payload)
 
+# ── Handle query-param navigation (sidebar HTML links) ───────────────────────
+import urllib.parse
+_qp = st.query_params
+if "tab" in _qp:
+    _tab = _qp["tab"]
+    if _tab in ("notes","practice") and st.session_state.tab != _tab:
+        st.session_state.tab = _tab
+        st.session_state.current_key = None
+        st.session_state.current_pid = None
+        st.session_state.revision_text = ""
+        st.query_params.clear()
+        st.rerun()
+
+if "nav" in _qp:
+    _nav = _qp["nav"]
+    _tab = _qp.get("tab", st.session_state.tab)
+    st.session_state.tab = _tab
+    if _tab == "notes":
+        st.session_state.current_key  = _nav
+        st.session_state.current_pid  = None
+        if "::" in _nav:
+            st.session_state.current_phase = _nav.split("::")[0]
+    else:
+        st.session_state.current_pid  = _nav
+        st.session_state.current_key  = None
+    st.session_state.revision_text = ""
+    st.session_state.revision_mode = None
+    st.query_params.clear()
+    st.rerun()
+
 # ── Topic / Phase data ────────────────────────────────────────────────────────
 PHASES = [
   {"id":"p1","label":"Phase 1","title":"Math & ML Foundations","color":"#7c6ef7","sections":[
@@ -429,97 +466,88 @@ with st.sidebar:
     </div>
     """, unsafe_allow_html=True)
 
-    # Tab switcher
-    st.markdown("<div style='padding:8px 10px 4px'>", unsafe_allow_html=True)
+    # ── Tab switcher (only 2 real buttons — fine) ─────────────────────────────
     c1, c2 = st.columns(2)
     with c1:
-        tab_cls = "tab-notes-btn" + (" tab-active" if st.session_state.tab == "notes" else "")
-        st.markdown(f'<div class="{tab_cls}">', unsafe_allow_html=True)
-        if st.button("📚 NOTES", key="tab_notes_btn", use_container_width=True):
-            st.session_state.tab = "notes"
-            st.rerun()
-        st.markdown("</div>", unsafe_allow_html=True)
+        notes_active = st.session_state.tab == "notes"
+        nb_style = "background:#7c6ef720;color:#7c6ef7;border:1px solid #7c6ef740;" if notes_active else "background:#1a1d26;color:#9298ab;border:1px solid #ffffff15;"
+        st.markdown(f'<button onclick="window.location.href=\'?tab=notes\'" style="{nb_style}width:100%;padding:7px 4px;border-radius:8px;font-family:Syne,sans-serif;font-weight:600;font-size:11px;cursor:pointer;transition:all .15s">📚 NOTES</button>', unsafe_allow_html=True)
     with c2:
-        tab_cls2 = "tab-practice-btn" + (" tab-active" if st.session_state.tab == "practice" else "")
-        st.markdown(f'<div class="{tab_cls2}">', unsafe_allow_html=True)
-        if st.button("⚡ PRACTICE", key="tab_practice_btn", use_container_width=True):
-            st.session_state.tab = "practice"
-            st.rerun()
-        st.markdown("</div>", unsafe_allow_html=True)
-    st.markdown("</div>", unsafe_allow_html=True)
+        prac_active = st.session_state.tab == "practice"
+        pb_style = "background:#7c6ef720;color:#7c6ef7;border:1px solid #7c6ef740;" if prac_active else "background:#1a1d26;color:#9298ab;border:1px solid #ffffff15;"
+        st.markdown(f'<button onclick="window.location.href=\'?tab=practice\'" style="{pb_style}width:100%;padding:7px 4px;border-radius:8px;font-family:Syne,sans-serif;font-weight:600;font-size:11px;cursor:pointer;transition:all .15s">⚡ PRACTICE</button>', unsafe_allow_html=True)
 
-    # Search
-    search = st.text_input("search", placeholder="Search topics…", label_visibility="collapsed", key="search_input")
+    st.markdown("<div style='height:4px'></div>", unsafe_allow_html=True)
+
+    # ── Search ────────────────────────────────────────────────────────────────
+    search = st.text_input("search", placeholder="🔍  Search topics…",
+                           label_visibility="collapsed", key="search_input")
     fl = search.strip().lower()
 
-    st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
+    st.markdown("<div style='height:2px'></div>", unsafe_allow_html=True)
 
-    if st.session_state.tab == "notes":
+    # ── Build nav HTML in one shot ────────────────────────────────────────────
+    ck_now  = st.session_state.current_key
+    pid_now = st.session_state.current_pid
+    cur_tab = st.session_state.tab
+
+    nav_html = '<div class="sb-nav">'
+
+    if cur_tab == "notes":
         for phase in PHASES:
-            all_t = [t for s in phase["sections"] for t in s["topics"]]
-            vis_t = [t for t in all_t if fl in t.lower()] if fl else all_t
+            all_t   = [t for s in phase["sections"] for t in s["topics"]]
+            vis_t   = [t for t in all_t if fl in t.lower()] if fl else all_t
             if not vis_t: continue
             noted_p = sum(1 for t in all_t if notes.get(nkey(phase["id"], t), "").strip())
-            pct = int(noted_p / len(all_t) * 100)
-            st.markdown(f"""
-            <div class="phase-header">
-              <span class="phase-dot" style="background:{phase['color']}"></span>
-              {phase['label']}: {phase['title']}
-              <span style="float:right;color:#5c6275">{noted_p}/{len(all_t)}</span>
+            pct     = int(noted_p / len(all_t) * 100) if all_t else 0
+
+            nav_html += f'''
+            <div class="sb-phase-hdr">
+              <span class="sb-pdot" style="background:{phase["color"]}"></span>
+              <span style="flex:1">{phase["label"]}: {phase["title"]}</span>
+              <span class="sb-pcnt">{noted_p}/{len(all_t)}</span>
             </div>
-            <div style="padding:0 14px 3px">
-              <div style="height:2px;background:#ffffff10;border-radius:1px;overflow:hidden">
-                <div style="width:{pct}%;height:100%;background:{phase['color']};border-radius:1px"></div>
+            <div class="sb-prog">
+              <div class="sb-prog-track">
+                <div class="sb-prog-fill" style="width:{pct}%;background:{phase["color"]}"></div>
               </div>
-            </div>
-            """, unsafe_allow_html=True)
+            </div>'''
+
             for section in phase["sections"]:
                 s_vis = [t for t in section["topics"] if fl in t.lower()] if fl else section["topics"]
                 if not s_vis: continue
-                st.markdown(f'<div class="phase-header" style="font-size:9px;padding:6px 14px 2px 28px">{section["title"]}</div>', unsafe_allow_html=True)
+                nav_html += f'<div class="sb-sec-lbl">{section["title"]}</div>'
                 for topic in s_vis:
-                    k = nkey(phase["id"], topic)
+                    k        = nkey(phase["id"], topic)
                     has_note = bool(notes.get(k, "").strip())
-                    is_active = st.session_state.current_key == k
-                    dot = "🟢 " if has_note else ""
-                    label = f"{dot}{topic}"
-                    active_cls = "nav-active" if is_active else ""
-                    st.markdown(f'<div class="{active_cls}">', unsafe_allow_html=True)
-                    if st.button(label, key=f"topic_{k}", use_container_width=True):
-                        st.session_state.current_key   = k
-                        st.session_state.current_phase = phase["id"]
-                        st.session_state.current_pid   = None
-                        st.session_state.revision_text = ""
-                        st.session_state.revision_mode = None
-                        st.rerun()
-                    st.markdown("</div>", unsafe_allow_html=True)
-    else:
-        # Practice tab
+                    is_act   = ck_now == k
+                    dot      = '<span class="sb-noted-dot"></span>' if has_note else ''
+                    act_cls  = " active" if is_act else ""
+                    href = f"?nav={urllib.parse.quote(k)}&tab=notes"
+                    nav_html += f'<a class="sb-topic{act_cls}" href="{href}" title="{topic}">{dot}{topic}</a>'
+
+    else:  # practice tab
         for cat in PRACTICE_CATS:
-            vis_p = [p for p in cat["projects"] if fl in p["title"].lower() or any(fl in s.lower() for s in p["skills"])] if fl else cat["projects"]
+            vis_p  = [p for p in cat["projects"] if fl in p["title"].lower() or any(fl in s.lower() for s in p["skills"])] if fl else cat["projects"]
             if not vis_p: continue
             done_c = sum(1 for p in cat["projects"] if done_practice.get(p["id"]))
-            st.markdown(f"""
-            <div class="phase-header">
-              <span class="phase-dot" style="background:{cat['color']}"></span>
-              {cat['label']}
-              <span style="float:right;color:#5c6275">{done_c}/{len(cat['projects'])}</span>
-            </div>
-            """, unsafe_allow_html=True)
+            nav_html += f'''
+            <div class="sb-phase-hdr">
+              <span class="sb-pdot" style="background:{cat["color"]}"></span>
+              <span style="flex:1">{cat["label"]}</span>
+              <span class="sb-pcnt">{done_c}/{len(cat["projects"])}</span>
+            </div>'''
             for proj in vis_p:
-                is_done = done_practice.get(proj["id"], False)
-                is_active = st.session_state.current_pid == proj["id"]
-                diff_color = {"easy":"#3dd68c","medium":"#f59e0b","hard":"#ef4444"}.get(proj["difficulty"],"#94a3b8")
-                dot = "✓ " if is_done else "● "
-                active_cls = "nav-active" if is_active else ""
-                st.markdown(f'<div class="{active_cls}">', unsafe_allow_html=True)
-                if st.button(f"{dot}{proj['title']}", key=f"proj_{proj['id']}", use_container_width=True):
-                    st.session_state.current_pid   = proj["id"]
-                    st.session_state.current_key   = None
-                    st.session_state.revision_text = ""
-                    st.session_state.revision_mode = None
-                    st.rerun()
-                st.markdown("</div>", unsafe_allow_html=True)
+                is_act    = pid_now == proj["id"]
+                is_done   = done_practice.get(proj["id"], False)
+                diff_col  = {"easy":"#3dd68c","medium":"#f59e0b","hard":"#ef4444"}.get(proj["difficulty"],"#94a3b8")
+                status    = f'<span style="color:{diff_col};font-size:8px;margin-right:4px">{"✓" if is_done else "●"}</span>'
+                act_cls   = " active" if is_act else ""
+                href      = f"?nav={urllib.parse.quote(proj['id'])}&tab=practice"
+                nav_html += f'<a class="sb-topic{act_cls}" href="{href}" title="{proj["title"]}">{status}{proj["title"]}</a>'
+
+    nav_html += '</div>'
+    st.markdown(nav_html, unsafe_allow_html=True)
 
 # ══════════════════════════════════════════════════════════════════════════════
 # MAIN AREA
